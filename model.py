@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+from torch.utils.data import DataLoader
+
+
 #define transformer block
 class TransformerBlock(nn.Module):
     def __init__(self, embedding_size, num_heads, forward_expansion, dropout):
@@ -82,18 +85,89 @@ class MyGPT2(nn.Module):
         logits = self.fc_out(out)
         return logits
 
-def generate_square_subsequent_mask(size):
-    mask = torch.tril(torch.ones(size, size)).to(torch.bool)
-    return mask
+    def generate_square_subsequent_mask(size):
+        mask = torch.tril(torch.ones(size, size)).to(torch.bool)
+        return mask
 
+
+# Training function
+def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda'):
+    model.to(device)
+    model.train()
+
+    # DataLoader for batching
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+
+    # Optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Loss function
+    criterion = nn.CrossEntropyLoss()
+
+    # Training loop
+    for epoch in range(num_epochs):
+        total_loss = 0
+        for batch_idx, (x, y) in enumerate(dataloader):
+            x, y = x.to(device), y.to(device)
+
+            # Generate mask for training
+            mask = model.generate_square_subsequent_mask(x.shape[1]).to(device)
+
+            # Forward pass
+            outputs = model(x, mask=mask)
+
+            # Reshape outputs and targets for calculating loss
+            outputs = outputs.view(-1, outputs.size(-1))
+            y = y.view(-1)
+
+            # Compute loss
+            loss = criterion(outputs, y)
+
+            # optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item()
+
+        # Print loss per epoch
+        avg_loss = total_loss / len(dataloader)
+        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
+
+
+# Inference function
+def predict(model, input_sequence, max_length=50, device='cuda'):
+    model.to(device)
+    model.eval()
+
+    generated_sequence = input_sequence.to(device)
+    mask = model.generate_square_subsequent_mask(generated_sequence.shape[1]).to(device)
+
+    with torch.no_grad():
+        for _ in range(max_length):
+            # Forward pass
+            outputs = model(generated_sequence, mask=mask)
+
+            # Get the predicted next token (take the last token in the sequence)
+            next_token_logits = outputs[:, -1, :]
+            next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+            # Append the predicted token to the generated sequence
+            generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+
+            # Update mask
+            mask = model.generate_square_subsequent_mask(generated_sequence.shape[1]).to(device)
+
+    return generated_sequence.cpu()
 
 if __name__ == "__main__":
     # hyper parameters
     vocab_size = 50257
+    # size of the embedding (original)
     embedding_size = 768
-    # number of transformer blocks
+    # number of transformer blocks (original)
     num_layers = 12
-    # number of attention heads
+    # number of attention heads (original)
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1

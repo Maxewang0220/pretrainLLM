@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import math
 
 from torch.utils.data import DataLoader
+from transformers import GPT2Tokenizer
 
 
 #define transformer block
@@ -134,6 +135,9 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
 
+    # save the model
+    torch.save(model.state_dict(), './model/model.pth')
+
 
 # Inference function
 def predict(model, input_sequence, max_length=50, device='cuda'):
@@ -175,6 +179,24 @@ if __name__ == "__main__":
 
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
+
+    # train
+    dataset = None
+    train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda')
+
+    # # inference
+    # model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
+    # model.load_state_dict(torch.load('./model/model.pth'))
+    #
+    # # input text
+    # input_text = "Once upon a time"
+    # tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    # input_ids = tokenizer.encode(input_text, return_tensors='pt')
+    #
+    # #generate text
+    # output = predict(model, input_ids, max_length=100, device='cuda')
+    # generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
+    # print(generated_text)
 
 
 

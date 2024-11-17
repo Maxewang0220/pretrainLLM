@@ -23,7 +23,7 @@ if __name__ == '__main__':
         device = 'cpu'
 
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
-        device='cuda')
+        device)
 
     dataset = load_dataset("upstage/Pretraining_Dataset", split="train[:1%]")
 
@@ -32,4 +32,4 @@ if __name__ == '__main__':
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=10, batch_size=8, learning_rate=1e-4, device='cuda')
+    train(model, dataset, num_epochs=10, batch_size=5, learning_rate=1e-4, device=device)

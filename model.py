@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 
 from torch.utils.data import DataLoader
+from torch.cuda.amp import autocast, GradScaler
 
 
 # define transformer block
@@ -92,11 +93,16 @@ class MyGPT2(nn.Module):
 
 
 # Training function
-def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda'):
+def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
     model.to(device)
     model.train()
 
     num_heads = model.layers[0].attention.num_heads  # Assuming TransformerBlock has `attention.num_heads`
+    # Generate causal mask (for time step dependencies)
+    seq_length = max_length
+    causal_mask = model.generate_square_subsequent_mask(seq_length).to(device)
+    causal_mask = causal_mask.unsqueeze(0).expand(batch_size, -1,
+                                                  -1)  # Shape: [batch_size, seq_length, seq_length]
 
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -117,20 +123,15 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             y = batch['labels'].to(device)  # Target labels
             attention_mask = batch['attention_mask'].to(device)  # Padding mask
 
-            # Generate causal mask (for time step dependencies)
-            seq_length = x.shape[1]
-            causal_mask = model.generate_square_subsequent_mask(seq_length).to(device)
-
             # Combine causal mask and attention mask
             # Convert attention_mask to 3D shape for compatibility with causal mask
             expanded_attention_mask = attention_mask.unsqueeze(1).expand(-1, seq_length,
                                                                          seq_length)  # Shape: [batch_size, seq_length, seq_length]
-            causal_mask = causal_mask.unsqueeze(0).expand(attention_mask.size(0), -1,
-                                                          -1)  # Shape: [batch_size, seq_length, seq_length]
+
             combined_mask = causal_mask * expanded_attention_mask  # Apply both masks
-            combined_mask = combined_mask.to(torch.float)
-            combined_mask = combined_mask.masked_fill(combined_mask == 0, float('-inf')).masked_fill(combined_mask == 1,
-                                                                                                     float(0.0))
+            combined_mask = combined_mask.to(torch.float).masked_fill(combined_mask == 0, float('-inf')).masked_fill(
+                combined_mask == 1,
+                float(0.0))
 
             # Add a num_heads dimension and expand it
             combined_mask = combined_mask.unsqueeze(1).expand(-1, num_heads, -1,
@@ -208,13 +209,14 @@ if __name__ == "__main__":
     forward_expansion = 4
     dropout = 0.1
     max_length = 512
+    device = 'cuda'
 
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
 
     # train
     dataset = None
-    train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda')
+    train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device=device)
 
     # # inference
     # model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)

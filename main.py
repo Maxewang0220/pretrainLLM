@@ -32,4 +32,4 @@ if __name__ == '__main__':
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=10, batch_size=4, learning_rate=1e-4, device=device)
+    train(model, dataset, num_epochs=10, batch_size=7, learning_rate=1e-4, device=device)

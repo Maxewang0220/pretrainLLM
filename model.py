@@ -92,17 +92,14 @@ class MyGPT2(nn.Module):
         return mask
 
 
-# Training function
 def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
     model.to(device)
     model.train()
 
-    num_heads = model.layers[0].attention.num_heads  # Assuming TransformerBlock has `attention.num_heads`
-    # Generate causal mask (for time step dependencies)
     seq_length = max_length
-    causal_mask = model.generate_square_subsequent_mask(seq_length).to(device)
-    causal_mask = causal_mask.unsqueeze(0).expand(batch_size, -1,
-                                                  -1)  # Shape: [batch_size, seq_length, seq_length]
+
+    # Generate causal mask (causal attention mask) as a 2D matrix
+    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
 
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -121,34 +118,15 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
         total_loss = 0
         t1 = time.time()
         for batch_idx, batch in enumerate(dataloader):
-            # Extract inputs and attention masks from batch
+            # Extract inputs and targets from batch
             x = batch['input_ids'].to(device)  # Input token IDs
             y = batch['labels'].to(device)  # Target labels
-            attention_mask = batch['attention_mask'].to(device)  # Padding mask
-
-            # Combine causal mask and attention mask
-            # Convert attention_mask to 3D shape for compatibility with causal mask
-            expanded_attention_mask = attention_mask.unsqueeze(1).expand(-1, seq_length,
-                                                                         seq_length)  # Shape: [batch_size, seq_length, seq_length]
-
-            combined_mask = causal_mask * expanded_attention_mask  # Apply both masks
-            combined_mask = combined_mask.to(torch.float).masked_fill(combined_mask == 0, float('-inf')).masked_fill(
-                combined_mask == 1,
-                float(0.0))
-
-            # Add a num_heads dimension and expand it
-            combined_mask = combined_mask.unsqueeze(1).expand(-1, num_heads, -1,
-                                                              -1)  # Shape: [batch_size, num_heads, seq_length, seq_length]
-
-            # Flatten batch and num_heads dimensions
-            combined_mask = combined_mask.reshape(batch_size * num_heads, seq_length,
-                                                  seq_length)  # Shape: [batch_size * num_heads, seq_length, seq_length]
 
             # Forward and backward pass with mixed precision
             optimizer.zero_grad()
 
             with autocast():  # Enable mixed precision
-                outputs = model(x, mask=combined_mask)
+                outputs = model(x, mask=causal_mask)
 
                 # Shift logits and labels for causal language modeling
                 outputs = outputs[:, :-1, :].contiguous()

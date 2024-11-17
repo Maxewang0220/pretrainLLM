@@ -1,13 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import math
 
 from torch.utils.data import DataLoader
-from transformers import GPT2Tokenizer
 
 
-#define transformer block
+# define transformer block
 class TransformerBlock(nn.Module):
     def __init__(self, embedding_size, num_heads, forward_expansion, dropout):
         super(TransformerBlock, self).__init__()
@@ -39,7 +36,7 @@ class TransformerBlock(nn.Module):
         # residual connection and dropout
         x = x + self.dropout(attention_output)
 
-        #normalization
+        # normalization
         x = self.norm1(x)
 
         # feed forward
@@ -50,7 +47,8 @@ class TransformerBlock(nn.Module):
 
         return out.transpose(0, 1)
 
-#model implementation
+
+# model implementation
 class MyGPT2(nn.Module):
     def __init__(self, vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length):
         super(MyGPT2, self).__init__()
@@ -117,6 +115,10 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             # Forward pass
             outputs = model(x, mask=mask)
 
+            # Shift logits and labels
+            outputs = outputs[:, :-1, :].contiguous()
+            y = y[:, 1:].contiguous()
+
             # Reshape outputs and targets for calculating loss
             outputs = outputs.view(-1, outputs.size(-1))
             y = y.view(-1)
@@ -164,6 +166,7 @@ def predict(model, input_sequence, max_length=50, device='cuda'):
 
     return generated_sequence.cpu()
 
+
 if __name__ == "__main__":
     # hyper parameters
     vocab_size = 50257
@@ -197,7 +200,3 @@ if __name__ == "__main__":
     # output = predict(model, input_ids, max_length=100, device='cuda')
     # generated_text = tokenizer.decode(output[0], skip_special_tokens=True)
     # print(generated_text)
-
-
-
-

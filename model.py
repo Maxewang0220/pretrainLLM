@@ -110,7 +110,6 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
-        i = 1
         t1 = time.time()
         for batch_idx, batch in enumerate(dataloader):
             # Extract inputs and attention masks from batch
@@ -161,8 +160,6 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             optimizer.step()
 
             total_loss += loss.item()
-            print("Step", i)
-            i += 1
 
         # Print loss per epoch
         avg_loss = total_loss / len(dataloader)

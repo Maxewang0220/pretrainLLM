@@ -1,3 +1,5 @@
+import time
+
 import torch
 import torch.nn as nn
 
@@ -72,7 +74,7 @@ class MyGPT2(nn.Module):
 
     def forward(self, x, mask=None):
         N, seq_length = x.shape
-        positions = torch.arange(0, seq_length).expand(N, seq_length).to(x.device)
+        positions = torch.arange(0, seq_length).unsqueeze(0).expand(N, seq_length).to(x.device)
 
         # add token and position embeddings
         out = self.dropout(self.token_embedding(x) + self.position_embedding(positions))
@@ -84,8 +86,8 @@ class MyGPT2(nn.Module):
         logits = self.fc_out(out)
         return logits
 
-    def generate_square_subsequent_mask(size):
-        mask = torch.tril(torch.ones(size, size)).to(torch.bool)
+    def generate_square_subsequent_mask(self, size):
+        mask = torch.tril(torch.ones(size, size)).to(torch.float)
         return mask
 
 
@@ -93,6 +95,8 @@ class MyGPT2(nn.Module):
 def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda'):
     model.to(device)
     model.train()
+
+    num_heads = model.layers[0].attention.num_heads  # Assuming TransformerBlock has `attention.num_heads`
 
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -106,38 +110,66 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
-        for batch_idx, (x, y) in enumerate(dataloader):
-            x, y = x.to(device), y.to(device)
+        i = 1
+        t1 = time.time()
+        for batch_idx, batch in enumerate(dataloader):
+            # Extract inputs and attention masks from batch
+            x = batch['input_ids'].to(device)  # Input token IDs
+            y = batch['labels'].to(device)  # Target labels
+            attention_mask = batch['attention_mask'].to(device)  # Padding mask
 
-            # Generate mask for training
-            mask = model.generate_square_subsequent_mask(x.shape[1]).to(device)
+            # Generate causal mask (for time step dependencies)
+            seq_length = x.shape[1]
+            causal_mask = model.generate_square_subsequent_mask(seq_length).to(device)
 
-            # Forward pass
-            outputs = model(x, mask=mask)
+            # Combine causal mask and attention mask
+            # Convert attention_mask to 3D shape for compatibility with causal mask
+            expanded_attention_mask = attention_mask.unsqueeze(1).expand(-1, seq_length,
+                                                                         seq_length)  # Shape: [batch_size, seq_length, seq_length]
+            causal_mask = causal_mask.unsqueeze(0).expand(attention_mask.size(0), -1,
+                                                          -1)  # Shape: [batch_size, seq_length, seq_length]
+            combined_mask = causal_mask * expanded_attention_mask  # Apply both masks
+            combined_mask = combined_mask.to(torch.float)
+            combined_mask = combined_mask.masked_fill(combined_mask == 0, float('-inf')).masked_fill(combined_mask == 1,
+                                                                                                     float(0.0))
 
-            # Shift logits and labels
+            # Add a num_heads dimension and expand it
+            combined_mask = combined_mask.unsqueeze(1).expand(-1, num_heads, -1,
+                                                              -1)  # Shape: [batch_size, num_heads, seq_length, seq_length]
+
+            # Flatten batch and num_heads dimensions
+            combined_mask = combined_mask.reshape(batch_size * num_heads, seq_length,
+                                                  seq_length)  # Shape: [batch_size * num_heads, seq_length, seq_length]
+
+            # Forward pass with combined mask
+            outputs = model(x, mask=combined_mask)
+
+            # Shift logits and labels for causal language modeling
             outputs = outputs[:, :-1, :].contiguous()
             y = y[:, 1:].contiguous()
 
             # Reshape outputs and targets for calculating loss
-            outputs = outputs.view(-1, outputs.size(-1))
-            y = y.view(-1)
+            outputs = outputs.view(-1, outputs.size(-1))  # Flatten outputs
+            y = y.view(-1)  # Flatten targets
 
             # Compute loss
             loss = criterion(outputs, y)
 
-            # optimize
+            # Optimize
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
+            print("Step", i)
+            i += 1
 
         # Print loss per epoch
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
+        print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
-    # save the model
+    # Save the model
     torch.save(model.state_dict(), './model/model.pth')
 
 

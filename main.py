@@ -1,6 +1,7 @@
 from model import MyGPT2, train
 from corpus_reader import load_dataset, tokenize_corpus
 from transformers import GPT2Tokenizer
+import torch
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
@@ -16,13 +17,19 @@ if __name__ == '__main__':
     dropout = 0.1
     max_length = 512
 
-    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
 
-    dataset = load_dataset("upstage/Pretraining_Dataset", split="train[:10%]")
+    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
+        device='cuda')
+
+    dataset = load_dataset("upstage/Pretraining_Dataset", split="train[:1%]")
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
     # Tokenize the dataset
-    tokenized_dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
+    dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda')
+    train(model, dataset, num_epochs=10, batch_size=8, learning_rate=1e-4, device='cuda')

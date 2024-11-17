@@ -136,6 +136,14 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
                 combined_mask == 1,
                 float(0.0))
 
+            # Add a num_heads dimension and expand it
+            combined_mask = combined_mask.unsqueeze(1).expand(-1, num_heads, -1,
+                                                              -1)  # Shape: [batch_size, num_heads, seq_length, seq_length]
+
+            # Flatten batch and num_heads dimensions
+            combined_mask = combined_mask.reshape(batch_size * num_heads, seq_length,
+                                                  seq_length)  # Shape: [batch_size * num_heads, seq_length, seq_length]
+
             # Forward and backward pass with mixed precision
             optimizer.zero_grad()
 

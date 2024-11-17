@@ -113,6 +113,9 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # Loss function
     criterion = nn.CrossEntropyLoss()
 
+    # GradScaler for mixed precision
+    scaler = GradScaler()
+
     # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
@@ -133,32 +136,29 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
                 combined_mask == 1,
                 float(0.0))
 
-            # Add a num_heads dimension and expand it
-            combined_mask = combined_mask.unsqueeze(1).expand(-1, num_heads, -1,
-                                                              -1)  # Shape: [batch_size, num_heads, seq_length, seq_length]
-
-            # Flatten batch and num_heads dimensions
-            combined_mask = combined_mask.reshape(batch_size * num_heads, seq_length,
-                                                  seq_length)  # Shape: [batch_size * num_heads, seq_length, seq_length]
-
-            # Forward pass with combined mask
-            outputs = model(x, mask=combined_mask)
-
-            # Shift logits and labels for causal language modeling
-            outputs = outputs[:, :-1, :].contiguous()
-            y = y[:, 1:].contiguous()
-
-            # Reshape outputs and targets for calculating loss
-            outputs = outputs.view(-1, outputs.size(-1))  # Flatten outputs
-            y = y.view(-1)  # Flatten targets
-
-            # Compute loss
-            loss = criterion(outputs, y)
-
-            # Optimize
+            # Forward and backward pass with mixed precision
             optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+
+            with autocast():  # Enable mixed precision
+                outputs = model(x, mask=combined_mask)
+
+                # Shift logits and labels for causal language modeling
+                outputs = outputs[:, :-1, :].contiguous()
+                y = y[:, 1:].contiguous()
+
+                # Reshape outputs and targets for calculating loss
+                outputs = outputs.view(-1, outputs.size(-1))
+                y = y.view(-1)
+
+                # Compute loss
+                loss = criterion(outputs, y)
+
+            # Backward pass with gradient scaling
+            scaler.scale(loss).backward()
+
+            # Optimization step
+            scaler.step(optimizer)
+            scaler.update()
 
             total_loss += loss.item()
 

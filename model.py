@@ -5,6 +5,7 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
+from transformers import GPT2Tokenizer
 
 
 # define transformer block
@@ -158,17 +159,24 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
 
 # Inference function
-def predict(model, input_sequence, max_length=50, device='cuda'):
+def predict(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, device='cuda'):
     model.to(device)
     model.eval()
 
-    generated_sequence = input_sequence.to(device)
-    mask = model.generate_square_subsequent_mask(generated_sequence.shape[1]).to(device)
+    if tokenizer is None:
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+
+    # Encode input text to token IDs
+    input_sequence = tokenizer(input_sequence, return_tensors="pt")
+    generated_sequence = input_sequence["input_ids"].to(device)
+
+    # Generate text
+    generated_text = []
 
     with torch.no_grad():
         for _ in range(max_length):
             # Forward pass
-            outputs = model(generated_sequence, mask=mask)
+            outputs = model(generated_sequence)
 
             # Get the predicted next token (take the last token in the sequence)
             next_token_logits = outputs[:, -1, :]
@@ -177,10 +185,16 @@ def predict(model, input_sequence, max_length=50, device='cuda'):
             # Append the predicted token to the generated sequence
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
 
-            # Update mask
-            mask = model.generate_square_subsequent_mask(generated_sequence.shape[1]).to(device)
+            # Decode the new token
+            new_token = tokenizer.decode(next_token[0], skip_special_tokens=True)
+            generated_text += new_token
+            print(new_token, end=' ')
 
-    return generated_sequence.cpu()
+            if eos_token_id is not None and next_token.item() == eos_token_id:
+                break
+
+    print("\n")
+    return generated_text
 
 
 if __name__ == "__main__":

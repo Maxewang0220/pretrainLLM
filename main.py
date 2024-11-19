@@ -25,11 +25,12 @@ if __name__ == '__main__':
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
         device)
 
-    dataset = load_dataset("upstage/Pretraining_Dataset", split="train[:1%]")
+    # dataset = load_dataset("upstage/Pretraining_Dataset", split="train")
+    dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split="train", trust_remote_code=True)
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=10, batch_size=7, learning_rate=1e-4, device=device)
+    train(model, dataset, num_epochs=1, batch_size=1, learning_rate=1e-4, device=device)

@@ -28,9 +28,9 @@ def tokenize_corpus(dataset, tokenizer, max_length=512):
     tokens = dataset.map(
         lambda x: tokenizer(
             x["text"],
-            truncation=True,  # 截断长文本，保证最大长度不超过 max_length
-            padding="max_length",  # 使用固定长度填充, 生成attention_mask
-            max_length=max_length  # 最大长度
+            truncation=True,  # clip long texts
+            padding="max_length",  # padding with fixed length
+            max_length=max_length
         ),
         batched=True,
     )

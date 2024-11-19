@@ -186,9 +186,9 @@ def predict(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, 
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
 
             # Decode the new token
-            new_token = tokenizer.decode(next_token[0], skip_special_tokens=True)
+            new_token = tokenizer.decode(next_token[0], skip_special_tokens=False)
             generated_text += new_token
-            print(new_token, end=' ')
+            print(new_token, end="")
 
             if eos_token_id is not None and next_token.item() == eos_token_id:
                 break

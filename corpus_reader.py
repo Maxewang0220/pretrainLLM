@@ -1,13 +1,20 @@
 import datasets
-from transformers import GPT2Tokenizer
 
 
 # Load the pretraining dataset
 def load_dataset(dataset_name, split):
-    return datasets.load_dataset(
+    dataset = datasets.load_dataset(
         dataset_name,
         split=split
     )
+
+    filtered_dataset = dataset.filter(
+        lambda example: example['meta'].get("redpajama_set_name") not in ["RedPajamaGithub", "RedPajamaArXiv",
+                                                                          "RedPajamaStackExchange"],
+        batched=False
+    )
+
+    return filtered_dataset
 
 
 # tokenize corpus transfer text 2 tokens

@@ -2,15 +2,31 @@ import datasets
 
 
 # Load the pretraining dataset
-def load_dataset(dataset_name, split):
+# def load_dataset(dataset_name, split):
+#     dataset = datasets.load_dataset(
+#         dataset_name,
+#         split=split
+#     )
+#
+#     filtered_dataset = dataset.filter(
+#         lambda example: example['meta'].get("redpajama_set_name") not in ["RedPajamaGithub", "RedPajamaArXiv",
+#                                                                           "RedPajamaStackExchange"],
+#         batched=False
+#     )
+#
+#     return filtered_dataset
+
+def load_dataset(dataset_name, split, trust_remote_code=True):
+    # 加载数据集
     dataset = datasets.load_dataset(
         dataset_name,
-        split=split
+        split=split,
+        trust_remote_code=trust_remote_code
     )
 
+    # 过滤掉 source 为 "github" 且长度小于 512 的数据
     filtered_dataset = dataset.filter(
-        lambda example: example['meta'].get("redpajama_set_name") not in ["RedPajamaGithub", "RedPajamaArXiv",
-                                                                          "RedPajamaStackExchange"],
+        lambda example: example.get('source') != "github" and len(example.get('text', '')) >= 512,
         batched=False
     )
 
@@ -28,9 +44,9 @@ def tokenize_corpus(dataset, tokenizer, max_length=512):
     tokens = dataset.map(
         lambda x: tokenizer(
             x["text"],
-            truncation=True,  # 截断长文本，保证最大长度不超过 max_length
-            padding="max_length",  # 使用固定长度填充, 生成attention_mask
-            max_length=max_length  # 最大长度
+            truncation=True,  # clip long texts
+            padding="max_length",  # padding with fixed length
+            max_length=max_length
         ),
         batched=True,
     )

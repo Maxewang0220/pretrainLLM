@@ -93,6 +93,69 @@ class MyGPT2(nn.Module):
         return mask
 
 
+# def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
+#     model.to(device)
+#     model.train()
+#
+#     seq_length = max_length
+#
+#     # Generate causal mask (causal attention mask) as a 2D matrix
+#     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
+#
+#     # DataLoader for batching
+#     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+#
+#     # Optimizer
+#     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+#
+#     # Loss function
+#     criterion = nn.CrossEntropyLoss()
+#
+#     # GradScaler for mixed precision
+#     scaler = GradScaler()
+#
+#     # Training loop
+#     for epoch in range(num_epochs):
+#         total_loss = 0
+#         t1 = time.time()
+#         for batch_idx, batch in enumerate(dataloader):
+#             # Extract inputs and targets from batch
+#             x = batch['input_ids'].to(device)  # Input token IDs
+#             y = batch['labels'].to(device)  # Target labels
+#
+#             # Forward and backward pass with mixed precision
+#             optimizer.zero_grad()
+#
+#             with autocast():  # Enable mixed precision
+#                 outputs = model(x, mask=causal_mask)
+#
+#                 # Shift logits and labels for causal language modeling
+#                 outputs = outputs[:, :-1, :].contiguous()
+#                 y = y[:, 1:].contiguous()
+#
+#                 # Reshape outputs and targets for calculating loss
+#                 outputs = outputs.view(-1, outputs.size(-1))
+#                 y = y.view(-1)
+#
+#                 # Compute loss
+#                 loss = criterion(outputs, y)
+#
+#             # Backward pass with gradient scaling
+#             scaler.scale(loss).backward()
+#
+#             # Optimization step
+#             scaler.step(optimizer)
+#             scaler.update()
+#
+#             total_loss += loss.item()
+#
+#         # Print loss per epoch
+#         avg_loss = total_loss / len(dataloader)
+#         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
+#         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
+#
+#     # Save the model
+#     torch.save(model.state_dict(), './model/model.pth')
 def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
     model.to(device)
     model.train()
@@ -100,7 +163,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     seq_length = max_length
 
     # Generate causal mask (causal attention mask) as a 2D matrix
-    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
+    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)
 
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -114,6 +177,13 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # GradScaler for mixed precision
     scaler = GradScaler()
 
+    # Total number of batches
+    total_batches = len(dataloader)
+
+    # 每完成10%保存一次
+    save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
+    save_intervals_idx = 0  # 当前进度检查点索引
+
     # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
@@ -126,7 +196,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             # Forward and backward pass with mixed precision
             optimizer.zero_grad()
 
-            with autocast():  # Enable mixed precision
+            with autocast():
                 outputs = model(x, mask=causal_mask)
 
                 # Shift logits and labels for causal language modeling
@@ -149,13 +219,23 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
             total_loss += loss.item()
 
+            # Check if we need to save the model at this batch
+            if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
+                model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
+                save_path = f'/kaggle/working/{model_name}'
+                torch.save(model.state_dict(), save_path)
+                print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
+                save_intervals_idx += 1  # Move to the next save interval
+
         # Print loss per epoch
         avg_loss = total_loss / len(dataloader)
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
-    # Save the model
-    torch.save(model.state_dict(), './model/model.pth')
+    # Save the final model
+    final_model_name = 'final_model.pth'
+    torch.save(model.state_dict(), f'/kaggle/working/{final_model_name}')
+    print(f"Final model saved at /kaggle/working/{final_model_name}")
 
 
 # Inference function

@@ -19,7 +19,7 @@ if __name__ == "__main__":
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
 
-    model.load_state_dict(torch.load('./model.pth'))
+    model.load_state_dict(torch.load('./model_epoch_7.pth'))
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 

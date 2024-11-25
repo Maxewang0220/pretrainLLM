@@ -226,9 +226,10 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 
-                # every 10% print the average loss so far
+                # 新增：打印平均损失值
                 avg_loss_so_far = total_loss / (batch_idx + 1)
                 print(f"Training progress: {save_intervals_idx + 1}0%, Average Loss so far: {avg_loss_so_far:.4f}")
+
                 save_intervals_idx += 1  # Move to the next save interval
 
         # Print loss per epoch

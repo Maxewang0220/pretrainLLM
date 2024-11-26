@@ -1,5 +1,5 @@
 from model import MyGPT2, train
-from corpus_reader import load_dataset, tokenize_corpus, load_dataset_wiki
+from corpus_reader import load_dataset, tokenize_corpus
 from transformers import GPT2Tokenizer
 import torch
 
@@ -25,9 +25,9 @@ if __name__ == '__main__':
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
         device)
 
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    dataset = load_dataset("upstage/Pretraining_Dataset", split="train[:1%]")
 
-    dataset = load_dataset_wiki(split="train[1%]", tokenizer=tokenizer, max_length=128)
+    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)

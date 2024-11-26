@@ -114,6 +114,13 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # GradScaler for mixed precision
     scaler = GradScaler()
 
+    # Total number of batches
+    total_batches = len(dataloader)
+
+    # 每完成10%保存一次
+    save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
+    save_intervals_idx = 0  # 当前进度检查点索引
+
     # Training loop
     for epoch in range(num_epochs):
         total_loss = 0
@@ -148,6 +155,19 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             scaler.update()
 
             total_loss += loss.item()
+
+            # Check if we need to save the model at this batch
+            if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
+                model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
+                save_path = f'/kaggle/working/{model_name}'
+                torch.save(model.state_dict(), save_path)
+                print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
+
+                # 新增：打印平均损失值
+                avg_loss_so_far = total_loss / (batch_idx + 1)
+                print(f"Training progress: {save_intervals_idx + 1}0%, Average Loss so far: {avg_loss_so_far:.4f}")
+
+                save_intervals_idx += 1  # Move to the next save interval
 
         # Print loss per epoch
         avg_loss = total_loss / len(dataloader)

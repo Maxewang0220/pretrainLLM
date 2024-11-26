@@ -1,4 +1,6 @@
 import datasets
+from datasets import Dataset
+from transformers import GPT2Tokenizer
 
 
 # Load the pretraining dataset
@@ -15,6 +17,46 @@ def load_dataset(dataset_name, split):
     )
 
     return filtered_dataset
+
+
+def load_dataset_wiki(tokenizer, max_length=128):
+    # 加载Wikipedia英文数据集
+    dataset = datasets.load_dataset(
+        "wikimedia/wikipedia",
+        "20231101.en",
+        split="train[:1]"
+    )
+
+    def tokenize_and_chunk(example):
+        # tokenize the text
+        tokens = tokenizer(example["text"], truncation=False, padding=False)["input_ids"]
+
+        # split the tokens into chunks of max_length and pad the last chunk if needed
+        chunks = []
+        for i in range(0, len(tokens), max_length):
+            chunk = tokens[i:i + max_length]
+
+            # Ensure padding only happens for the last chunk
+            if len(chunk) < max_length:
+                chunk += [tokenizer.pad_token_id] * (max_length - len(chunk))
+
+            chunks.append(chunk)
+
+        return {"input_ids": chunks, "labels": chunks}
+
+    chunked_dataset = dataset.map(tokenize_and_chunk, batched=False)
+
+    # Flatten all chunks and create new columns for input_ids and labels
+    flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]
+    flattened_labels = [chunk for chunks in chunked_dataset["labels"] for chunk in chunks]
+
+    # Create a new dataset with input_ids and labels
+    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids, "labels": flattened_labels})
+
+    # Set the dataset format to PyTorch
+    new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
+
+    return new_dataset
 
 
 # tokenize corpus transfer text 2 tokens
@@ -48,11 +90,16 @@ def tokenize_corpus(dataset, tokenizer, max_length=128):
 
 
 if __name__ == "__main__":
-    pretraining_dataset = load_dataset(
-        "upstage/Pretraining_Dataset",
-        split="train"
-    )
+    # pretraining_dataset = load_dataset(
+    #     "upstage/Pretraining_Dataset",
+    #     split="train"
+    # )
+    #
+    # print(pretraining_dataset)
+    # for example in pretraining_dataset["text"][:5]:
+    #     print(example)
 
-    print(pretraining_dataset)
-    for example in pretraining_dataset["text"][:5]:
-        print(example)
+    dataset = load_dataset_wiki(GPT2Tokenizer.from_pretrained('gpt2'), 128)
+    print(dataset)
+    for i in range(0, 100):
+        print(dataset[i])

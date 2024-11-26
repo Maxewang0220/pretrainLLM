@@ -19,12 +19,12 @@ def load_dataset(dataset_name, split):
     return filtered_dataset
 
 
-def load_dataset_wiki(tokenizer, max_length=128):
+def load_dataset_wiki(split, tokenizer, max_length=128):
     # 加载Wikipedia英文数据集
     dataset = datasets.load_dataset(
         "wikimedia/wikipedia",
         "20231101.en",
-        split="train[:1]"
+        split=split
     )
 
     def tokenize_and_chunk(example):

@@ -13,7 +13,7 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 128
+    max_length = 512
     device = 'cuda'
 
     # instantiate the model

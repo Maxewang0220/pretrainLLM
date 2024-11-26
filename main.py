@@ -27,9 +27,6 @@ if __name__ == '__main__':
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-    dataset = load_dataset_wiki(split="train[1%]", tokenizer=tokenizer, max_length=128)
-
-    # Tokenize the dataset
-    dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
+    dataset = load_dataset_wiki(split="train[:1]", tokenizer=tokenizer, max_length=128)
 
     train(model, dataset, num_epochs=10, batch_size=32, learning_rate=1e-4, device=device)

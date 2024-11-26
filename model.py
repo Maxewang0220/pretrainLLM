@@ -97,8 +97,6 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     model.to(device)
     model.train()
 
-    seq_length = max_length
-
     # Generate causal mask (causal attention mask) as a 2D matrix
     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
 

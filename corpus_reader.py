@@ -38,7 +38,7 @@ def load_dataset_wiki(split, tokenizer, max_length=128):
 
             # Ensure padding only happens for the last chunk
             if len(chunk) < max_length:
-                chunk += [tokenizer.pad_token_id] * (max_length - len(chunk))
+                chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
 
             chunks.append(chunk)
 
@@ -99,7 +99,5 @@ if __name__ == "__main__":
     # for example in pretraining_dataset["text"][:5]:
     #     print(example)
 
-    dataset = load_dataset_wiki(GPT2Tokenizer.from_pretrained('gpt2'), 128)
-    print(dataset)
-    for i in range(0, 100):
-        print(dataset[i])
+    dataset = load_dataset_wiki("train[:1]", GPT2Tokenizer.from_pretrained('gpt2'), 128)
+    print(type(dataset["input_ids"]))

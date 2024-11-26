@@ -1,5 +1,5 @@
 from model import MyGPT2, train
-from corpus_reader import load_dataset, tokenize_corpus
+from corpus_reader import load_dataset, tokenize_corpus, load_dataset_wiki
 from transformers import GPT2Tokenizer
 import torch
 
@@ -15,7 +15,7 @@ if __name__ == '__main__':
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 512
+    max_length = 128
 
     if torch.cuda.is_available():
         device = 'cuda'
@@ -25,12 +25,11 @@ if __name__ == '__main__':
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
         device)
 
-    # dataset = load_dataset("upstage/Pretraining_Dataset", split="train")
-    dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split="train", trust_remote_code=True)
-
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+
+    dataset = load_dataset_wiki(split="train[1%]", tokenizer=tokenizer, max_length=128)
 
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=1, batch_size=1, learning_rate=1e-4, device=device)
+    train(model, dataset, num_epochs=10, batch_size=32, learning_rate=1e-4, device=device)

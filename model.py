@@ -93,77 +93,14 @@ class MyGPT2(nn.Module):
         return mask
 
 
-# def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
-#     model.to(device)
-#     model.train()
-#
-#     seq_length = max_length
-#
-#     # Generate causal mask (causal attention mask) as a 2D matrix
-#     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
-#
-#     # DataLoader for batching
-#     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-#
-#     # Optimizer
-#     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-#
-#     # Loss function
-#     criterion = nn.CrossEntropyLoss()
-#
-#     # GradScaler for mixed precision
-#     scaler = GradScaler()
-#
-#     # Training loop
-#     for epoch in range(num_epochs):
-#         total_loss = 0
-#         t1 = time.time()
-#         for batch_idx, batch in enumerate(dataloader):
-#             # Extract inputs and targets from batch
-#             x = batch['input_ids'].to(device)  # Input token IDs
-#             y = batch['labels'].to(device)  # Target labels
-#
-#             # Forward and backward pass with mixed precision
-#             optimizer.zero_grad()
-#
-#             with autocast():  # Enable mixed precision
-#                 outputs = model(x, mask=causal_mask)
-#
-#                 # Shift logits and labels for causal language modeling
-#                 outputs = outputs[:, :-1, :].contiguous()
-#                 y = y[:, 1:].contiguous()
-#
-#                 # Reshape outputs and targets for calculating loss
-#                 outputs = outputs.view(-1, outputs.size(-1))
-#                 y = y.view(-1)
-#
-#                 # Compute loss
-#                 loss = criterion(outputs, y)
-#
-#             # Backward pass with gradient scaling
-#             scaler.scale(loss).backward()
-#
-#             # Optimization step
-#             scaler.step(optimizer)
-#             scaler.update()
-#
-#             total_loss += loss.item()
-#
-#         # Print loss per epoch
-#         avg_loss = total_loss / len(dataloader)
-#         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
-#         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
-#
-#     # Save the model
-#     torch.save(model.state_dict(), './model/model.pth')
-def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
+def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=128):
     model.to(device)
     model.train()
 
     seq_length = max_length
 
     # Generate causal mask (causal attention mask) as a 2D matrix
-    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)
+    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
 
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -196,7 +133,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             # Forward and backward pass with mixed precision
             optimizer.zero_grad()
 
-            with autocast():
+            with autocast():  # Enable mixed precision
                 outputs = model(x, mask=causal_mask)
 
                 # Shift logits and labels for causal language modeling
@@ -237,10 +174,8 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
-    # Save the final model
-    final_model_name = 'final_model.pth'
-    torch.save(model.state_dict(), f'/kaggle/working/{final_model_name}')
-    print(f"Final model saved at /kaggle/working/{final_model_name}")
+    # Save the model
+    torch.save(model.state_dict(), './model/model.pth')
 
 
 # Inference function
@@ -293,7 +228,7 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 512
+    max_length = 128
     device = 'cuda'
 
     # instantiate the model

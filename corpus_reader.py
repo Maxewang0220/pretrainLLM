@@ -18,7 +18,7 @@ def load_dataset(dataset_name, split):
 
 
 # tokenize corpus transfer text 2 tokens
-def tokenize_corpus(dataset, tokenizer, max_length=512):
+def tokenize_corpus(dataset, tokenizer, max_length=128):
     # Set pad token to eos token if pad token is None
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token

@@ -15,7 +15,7 @@ if __name__ == '__main__':
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 512
+    max_length = 128
 
     if torch.cuda.is_available():
         device = 'cuda'
@@ -32,4 +32,4 @@ if __name__ == '__main__':
     # Tokenize the dataset
     dataset = tokenize_corpus(dataset, tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=10, batch_size=7, learning_rate=1e-4, device=device)
+    train(model, dataset, num_epochs=10, batch_size=32, learning_rate=1e-4, device=device)

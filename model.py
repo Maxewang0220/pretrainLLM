@@ -93,7 +93,7 @@ class MyGPT2(nn.Module):
         return mask
 
 
-def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
+def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=128):
     model.to(device)
     model.train()
 
@@ -208,7 +208,7 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 512
+    max_length = 128
     device = 'cuda'
 
     # instantiate the model

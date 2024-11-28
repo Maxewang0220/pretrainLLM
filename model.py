@@ -154,8 +154,11 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
             total_loss += loss.item()
 
-            print(f"{batch_idx}: {total_loss/(batch_idx + 1):.3f}")
-            print(f"Time taken for a batch: {time.time() - t1:.2f} sec\n")
+            if batch_idx % 100 == 0:
+                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss/(batch_idx + 1):.3f}")
+                t2 = time.time()
+                print(f"Time taken for 100 batches: {t2 - t1:.2f} sec\n")
+                t1 = t2
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:

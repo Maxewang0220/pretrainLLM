@@ -154,10 +154,13 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
             total_loss += loss.item()
 
+            print(f"{batch_idx}: {total_loss/(batch_idx + 1):.3f}")
+            print(f"Time taken for a batch: {time.time() - t1:.2f} sec\n")
+
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
                 model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
-                save_path = f'/kaggle/working/{model_name}'
+                save_path = f'./model/checkpoint/{model_name}'
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 

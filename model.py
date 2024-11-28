@@ -97,8 +97,6 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     model.to(device)
     model.train()
 
-    seq_length = max_length
-
     # Generate causal mask (causal attention mask) as a 2D matrix
     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
 
@@ -116,6 +114,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
     # Total number of batches
     total_batches = len(dataloader)
+    print("total batches num: ", total_batches)
 
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
@@ -156,10 +155,16 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
             total_loss += loss.item()
 
+            if batch_idx % 100 == 0:
+                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss/(batch_idx + 1):.3f}")
+                t2 = time.time()
+                print(f"Time taken for 100 batches: {t2 - t1:.2f} sec\n")
+                t1 = t2
+
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
                 model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
-                save_path = f'/kaggle/working/{model_name}'
+                save_path = f'./model/checkpoint/{model_name}'
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 

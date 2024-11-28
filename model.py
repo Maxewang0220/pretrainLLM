@@ -114,6 +114,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
     # Total number of batches
     total_batches = len(dataloader)
+    print("total batches num: ", total_batches)
 
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]

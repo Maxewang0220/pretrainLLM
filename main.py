@@ -31,4 +31,4 @@ if __name__ == '__main__':
 
     dataset = load_dataset_wiki(split="train[:2%]", tokenizer=tokenizer, max_length=128)
 
-    train(model, dataset, num_epochs=1, batch_size=64, learning_rate=1e-6, device=device)
+    train(model, dataset, num_epochs=1, batch_size=96, learning_rate=1e-6, device=device)

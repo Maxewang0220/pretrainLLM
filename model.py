@@ -182,6 +182,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
                 save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
+                logging.info(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 
                 # 新增：打印平均损失值
                 avg_loss_so_far = total_loss / (batch_idx + 1)

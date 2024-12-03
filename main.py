@@ -29,6 +29,6 @@ if __name__ == '__main__':
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-    dataset = load_dataset_wiki(split="train[:2%]", tokenizer=tokenizer, max_length=128)
+    dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer=tokenizer, max_length=max_length)
 
-    train(model, dataset, num_epochs=1, batch_size=96, learning_rate=1e-6, device=device)
+    train(model, dataset, num_epochs=2, batch_size=32, learning_rate=1e-4, device=device, max_length=max_length)

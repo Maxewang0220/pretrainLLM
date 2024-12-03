@@ -167,7 +167,8 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             total_loss += loss.item()
 
             if batch_idx % 100 == 0:
-                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss/(batch_idx + 1):.3f} current_loss {loss}")
+                print(
+                    f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f} current_loss {loss}")
                 t3 = time.time()
                 print(f"Time taken for 100 batches: {t3 - t2:.2f} sec\n")
                 logging.info(
@@ -177,7 +178,7 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
-                model_name = f'model_{epoch+1}_{save_intervals_idx + 1}0_percent.pth'
+                model_name = f'model_{epoch + 1}_{save_intervals_idx + 1}0_percent.pth'
                 # SAVE PATH
                 save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)

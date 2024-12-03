@@ -1,5 +1,5 @@
 import time
-
+import logging
 import torch
 import torch.nn as nn
 
@@ -97,6 +97,15 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     model.to(device)
     model.train()
 
+    # 配置日志输出到文件
+    logging.basicConfig(
+        filename="app.log",  # 指定日志文件路径
+        level=logging.INFO,  # 设置日志级别
+        format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
+        datefmt="%Y-%m-%d %H:%M:%S",
+        filemode="a"  # 追加模式（默认），可选 "w" 表示覆盖模式
+    )
+
     # Generate causal mask (causal attention mask) as a 2D matrix
     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
 
@@ -118,12 +127,14 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
 
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
-    save_intervals_idx = 0  # 当前进度检查点索引
 
     # Training loop
     for epoch in range(num_epochs):
+        save_intervals_idx = 0  # 当前进度检查点索引
         total_loss = 0
         t1 = time.time()
+        t2 = time.time()
+
         for batch_idx, batch in enumerate(dataloader):
             # Extract inputs and targets from batch
             x = batch['input_ids'].to(device)  # Input token IDs
@@ -156,17 +167,22 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             total_loss += loss.item()
 
             if batch_idx % 100 == 0:
-                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f}")
+                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss/(batch_idx + 1):.3f} current_loss {loss}")
+                t3 = time.time()
+                print(f"Time taken for 100 batches: {t3 - t2:.2f} sec\n")
+                logging.info(
+                    f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f} current_loss {loss}\n"
+                    f"Time taken for 100 batches: {t3 - t2:.2f} sec")
                 t2 = time.time()
-                print(f"Time taken for 100 batches: {t2 - t1:.2f} sec\n")
-                t1 = t2
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
-                model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
-                save_path = f'./kaggle/working/{model_name}'
+                model_name = f'model_{epoch+1}_{save_intervals_idx + 1}0_percent.pth'
+                # SAVE PATH
+                save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
+                logging.info(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 
                 # 新增：打印平均损失值
                 avg_loss_so_far = total_loss / (batch_idx + 1)
@@ -180,7 +196,8 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
     # Save the model
-    torch.save(model.state_dict(), './kaggle/working/model.pth')
+    # SAVE PATH
+    torch.save(model.state_dict(), './model.pth')
 
 
 # Inference function

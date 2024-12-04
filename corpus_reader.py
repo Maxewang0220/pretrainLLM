@@ -22,7 +22,7 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
             # Ensure padding only happens for the last chunk
             if len(chunk) == max_length:
                 chunks.append(chunk)
-            elif len(chunk) > max_length - 10:
+            elif len(chunk) > max_length * 0.8:
                 chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
                 chunks.append(chunk)
 

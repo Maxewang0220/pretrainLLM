@@ -32,7 +32,7 @@ if __name__ == '__main__':
     train_dataset = load_dataset("Skylion007/openwebtext", split="train[:10%]", tokenizer=tokenizer, max_length=max_length)
 
     valid_dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer= tokenizer, max_length=max_length)
-    valid_dataset = valid_dataset.shuffle(seed=7)
+    valid_dataset = valid_dataset.shuffle(seed=42)
     valid_dataset = valid_dataset.select(range(10))
 
-    train(model, train_dataset, valid_dataset= valid_dataset, num_epochs=1, batch_size=24, learning_rate=1e-6, device=device, max_length=max_length)
+    train(model, train_dataset, valid_dataset= valid_dataset, num_epochs=1, batch_size=24, learning_rate=3e-5, device=device, max_length=max_length)

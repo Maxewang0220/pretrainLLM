@@ -7,7 +7,8 @@ from transformers import GPT2Tokenizer
 def load_dataset(dataset_name, split, tokenizer, max_length=128):
     dataset = datasets.load_dataset(
         dataset_name,
-        split=split
+        split=split,
+        trust_remote_code=True
     )
 
     def tokenize_and_chunk(example):

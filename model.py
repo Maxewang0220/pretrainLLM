@@ -94,7 +94,7 @@ class MyGPT2(nn.Module):
         return mask
 
 
-def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=128):
+def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=128):
     model.to(device)
     model.train()
 
@@ -125,6 +125,9 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # Total number of batches
     total_batches = len(dataloader)
     print("total batches num: ", total_batches)
+    logging.info(f"total batches num: {total_batches}")
+    valid_x = valid_dataset["input_ids"].to(device)
+    valid_y = valid_dataset["labels"].to(device)
 
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
@@ -175,6 +178,30 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
                 logging.info(
                     f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f} current_loss {loss}\n"
                     f"Time taken for 100 batches: {t3 - t2:.2f} sec")
+                t2 = time.time()
+
+            if batch_idx % 6000 == 0:
+                with torch.no_grad():
+                    outputs = model(valid_x, mask=causal_mask)
+
+                    # Shift logits and labels for causal language modeling
+                    outputs = outputs[:, :-1, :].contiguous()
+                    valid_y1 = valid_y[:, 1:].contiguous()
+
+                    # Reshape outputs and targets for calculating loss
+                    outputs = outputs.view(-1, outputs.size(-1))
+                    valid_y1 = valid_y1.view(-1)
+
+                    # Compute loss
+                    loss = criterion(outputs, valid_y1)
+
+                print(
+                    f"batch 6000 index {batch_idx}: valid_loss {loss}")
+                t3 = time.time()
+                print(f"Time taken for evaluation: {t3 - t2:.2f} sec\n")
+                logging.info(
+                    f"batch 6000 index {batch_idx}: valid_loss {loss}\n"
+                    f"Time taken for evaluation: {t3 - t2:.2f} sec")
                 t2 = time.time()
 
             # Check if we need to save the model at this batch
@@ -252,7 +279,7 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 128
+    max_length = 1024
     device = 'cuda'
 
     # instantiate the model

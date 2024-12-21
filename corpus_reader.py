@@ -46,6 +46,47 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
 
     return new_dataset
 
+# Load the pretraining dataset
+def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128):
+    dataset = datasets.load_dataset(
+        dataset_name,
+        split=split,
+        trust_remote_code=True
+    )
+
+    def tokenize_and_chunk(example):
+        # tokenize the text
+        text = example["text"]
+        text = re.sub(r"\n{2,}", "\n", text)  # 将连续的两个或以上 \n 替换为一个 \n
+        tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
+
+        # split the tokens into chunks of max_length and pad the last chunk if needed
+        chunks = []
+        for i in range(0, len(tokens), max_length):
+            chunk = tokens[i:i + max_length]
+
+            # Ensure padding only happens for the last chunk
+            if len(chunk) == max_length:
+                chunks.append(chunk)
+            elif len(chunk) > max_length * 0.8:
+                chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
+                chunks.append(chunk)
+
+        return {"input_ids": chunks, "labels": chunks}
+
+    chunked_dataset = dataset.map(tokenize_and_chunk, batched=False)
+
+    # Flatten all chunks and create new columns for input_ids and labels
+    flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]
+    flattened_labels = [chunk for chunks in chunked_dataset["labels"] for chunk in chunks]
+
+    # Create a new dataset with input_ids and labels
+    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids, "labels": flattened_labels})
+
+    # Set the dataset format to PyTorch
+    new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
+
+    return new_dataset
 
 def load_dataset_wiki(split, tokenizer, max_length=128):
     # 加载Wikipedia英文数据集

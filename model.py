@@ -101,7 +101,7 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
 
     # 配置日志输出到文件
     logging.basicConfig(
-        filename="app3.log",  # 指定日志文件路径
+        filename="app4.log",  # 指定日志文件路径
         level=logging.INFO,  # 设置日志级别
         format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
         datefmt="%Y-%m-%d %H:%M:%S",

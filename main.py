@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-    dataset = load_dataset("bookcorpus/bookcorpus", split="train", tokenizer=tokenizer, max_length=max_length)
+    dataset = load_dataset("bookcorpus/bookcorpus", split="train[:10%]", tokenizer=tokenizer, max_length=max_length)
     dataset = dataset.shuffle(seed=32)
 
     valid_dataset = dataset.select(range(10))

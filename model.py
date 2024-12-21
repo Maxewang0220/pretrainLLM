@@ -6,6 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from transformers import GPT2Tokenizer
+from transformers import get_scheduler
 
 
 # define transformer block
@@ -94,13 +95,13 @@ class MyGPT2(nn.Module):
         return mask
 
 
-def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=128):
+def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=3e-4, device='cuda', max_length=128, warmup_ratio=0.05):
     model.to(device)
     model.train()
 
     # 配置日志输出到文件
     logging.basicConfig(
-        filename="app.log",  # 指定日志文件路径
+        filename="app3.log",  # 指定日志文件路径
         level=logging.INFO,  # 设置日志级别
         format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -113,8 +114,20 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+    # calculate warmup steps
+    total_steps = num_epochs * len(dataloader)
+    warmup_steps = int(warmup_ratio * total_steps)
+
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+
+    # learning rate scheduler
+    scheduler = get_scheduler(
+        name="cosine",                 # 学习率调度类型
+        optimizer=optimizer,
+        num_warmup_steps=warmup_steps, # Warm-up 阶段的步数
+        num_training_steps=total_steps # 总训练步数
+    )
 
     # Loss function
     criterion = nn.CrossEntropyLoss()
@@ -168,6 +181,9 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
             scaler.step(optimizer)
             scaler.update()
 
+            # update learning rate
+            scheduler.step()
+
             total_loss += loss.item()
 
             if batch_idx % 100 == 0:
@@ -198,9 +214,12 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
                 print(
                     f"batch 6000 index {batch_idx}: valid_loss {loss}")
                 t3 = time.time()
+                current_lr = scheduler.get_last_lr()[0]
+                print(f"Current Learning Rate: {current_lr:.8f}")
                 print(f"Time taken for evaluation: {t3 - t2:.2f} sec\n")
                 logging.info(
                     f"batch 6000 index {batch_idx}: valid_loss {loss}\n"
+                    f"Current Learning Rate: {current_lr:.8f}\n"
                     f"Time taken for evaluation: {t3 - t2:.2f} sec")
                 t2 = time.time()
 
@@ -224,9 +243,9 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
-    # Save the model
-    # SAVE PATH
-    torch.save(model.state_dict(), './model.pth')
+    # # Save the model
+    # # SAVE PATH
+    # torch.save(model.state_dict(), './model.pth')
 
 
 # Inference function

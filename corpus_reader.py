@@ -15,7 +15,6 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
     def tokenize_and_chunk(example):
         # tokenize the text
         text = example["text"]
-        text = text.replace("\r", "")  # 去除 \r
         text = re.sub(r"\n{2,}", "\n", text)  # 将连续的两个或以上 \n 替换为一个 \n
         tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
 

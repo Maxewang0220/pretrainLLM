@@ -47,24 +47,46 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
     return new_dataset
 
 # Load the pretraining dataset
-def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128):
+def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, concat_size=20000):
+    # Step 1: Load dataset
     dataset = datasets.load_dataset(
         dataset_name,
         split=split,
         trust_remote_code=True
     )
 
-    def tokenize_and_chunk(example):
-        # tokenize the text
-        text = example["text"]
-        text = re.sub(r"\n{2,}", "\n", text)  # 将连续的两个或以上 \n 替换为一个 \n
+    # Step 2: Concatenate text
+    def concatenate_text(examples):
+        # Split the text into batches of `concat_size` paragraphs
+        concatenated_text = []
+        buffer = []
+        for text in examples["text"]:
+            buffer.append(text)
+            if len(buffer) >= concat_size:  # If buffer reaches `concat_size`, join and append
+                concatenated_text.append("".join(buffer))
+                buffer = []
+        if buffer:  # Add remaining text if any
+            concatenated_text.append("".join(buffer))
+
+        return {"text": concatenated_text}
+
+    concatenated_dataset = dataset.map(
+        concatenate_text,
+        batched=True,
+        batch_size=1000,  # Adjust depending on memory
+        num_proc=8  # Number of parallel processes
+    )
+
+    # Step 3: Chunk tokenized text
+    def tokenize_and_chunk(examples):
+        text = examples["text"]
         tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
 
-        # split the tokens into chunks of max_length and pad the last chunk if needed
         chunks = []
+
+        # Slice with step_size=chunk_size
         for i in range(0, len(tokens), max_length):
             chunk = tokens[i:i + max_length]
-
             # Ensure padding only happens for the last chunk
             if len(chunk) == max_length:
                 chunks.append(chunk)
@@ -74,7 +96,10 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128):
 
         return {"input_ids": chunks, "labels": chunks}
 
-    chunked_dataset = dataset.map(tokenize_and_chunk, batched=False)
+    chunked_dataset = concatenated_dataset.map(
+        tokenize_and_chunk,
+        batched=False
+    )
 
     # Flatten all chunks and create new columns for input_ids and labels
     flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]

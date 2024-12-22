@@ -95,7 +95,7 @@ class MyGPT2(nn.Module):
         return mask
 
 
-def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=3e-4, device='cuda', max_length=128, warmup_ratio=0.05):
+def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda', max_length=128, warmup_ratio=0.03):
     model.to(device)
     model.train()
 

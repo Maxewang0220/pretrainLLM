@@ -1,5 +1,5 @@
 from model import MyGPT2, train
-from corpus_reader import load_dataset, tokenize_corpus, load_dataset_wiki
+from corpus_reader import load_dataset, tokenize_corpus, load_dataset_bookcorpus
 from transformers import GPT2Tokenizer
 import torch
 
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
-    dataset = load_dataset("bookcorpus/bookcorpus", split="train[:10%]", tokenizer=tokenizer, max_length=max_length)
+    dataset = load_dataset_bookcorpus("bookcorpus/bookcorpus", split="train", tokenizer=tokenizer, max_length=max_length)
     dataset = dataset.shuffle(seed=32)
 
     valid_dataset = dataset.select(range(10))

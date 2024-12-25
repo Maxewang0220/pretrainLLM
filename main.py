@@ -1,4 +1,4 @@
-from model import MyGPT2, train
+from model import MyGPT2,MyGPT,train
 from corpus_reader import load_dataset, tokenize_corpus, load_dataset_bookcorpus
 from transformers import GPT2Tokenizer
 import torch
@@ -24,7 +24,7 @@ if __name__ == '__main__':
 
     print(device)
 
-    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
+    model = MyGPT(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(
         device)
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
@@ -36,4 +36,4 @@ if __name__ == '__main__':
 
     train_dataset = dataset.select(range(10, len(dataset)))
 
-    train(model, train_dataset, valid_dataset= valid_dataset, num_epochs=1, batch_size=24, learning_rate=3e-4, device=device, max_length=max_length)
+    train(model, train_dataset, valid_dataset= valid_dataset, num_epochs=1, batch_size=24, learning_rate=1.5e-4, device=device, max_length=max_length, warmup_ratio=0.03)

@@ -95,13 +95,99 @@ class MyGPT2(nn.Module):
         return mask
 
 
+class GPT2Block(nn.Module):
+    def __init__(self, embedding_size, num_heads, forward_expansion, dropout):
+        super(GPT2Block, self).__init__()
+
+        # multi-head attention
+        self.attn = nn.MultiheadAttention(embedding_size, num_heads, dropout=dropout, batch_first=True)
+        # GPT-2风格：在进入子层之前做LayerNorm
+        self.ln_1 = nn.LayerNorm(embedding_size)
+        self.ln_2 = nn.LayerNorm(embedding_size)
+
+        # feed forward: MLP
+        self.mlp = nn.Sequential(
+            nn.Linear(embedding_size, forward_expansion * embedding_size),
+            nn.GELU(),
+            nn.Linear(forward_expansion * embedding_size, embedding_size)
+        )
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        # x: shape (batch_size, seq_length, embedding_size)
+
+        # 1) Pre-LN, Self-Attention
+        x = self.ln_1(x)  # GPT-2 style: apply LN before attention
+        # batch_first=True，所以不需要转置
+        attn_out, _ = self.attn(x, x, x, attn_mask=mask)
+        x = x + self.drop(attn_out)  # 残差连接
+
+        # 2) Pre-LN, Feed Forward
+        m = self.ln_2(x)
+        mlp_out = self.mlp(m)
+        x = x + self.drop(mlp_out)
+
+        return x
+
+class MyGPT(nn.Module):
+    def __init__(self, vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length=1024):
+        super(MyGPT, self).__init__()
+
+        # token & position embeddings
+        self.token_embedding = nn.Embedding(vocab_size, embedding_size)
+        self.position_embedding = nn.Embedding(max_length, embedding_size)
+
+        # transformer blocks
+        self.layers = nn.ModuleList([
+            GPT2Block(embedding_size, num_heads, forward_expansion, dropout)
+            for _ in range(num_layers)
+        ])
+
+        # last layer norm (ln_f)
+        self.ln_f = nn.LayerNorm(embedding_size)
+
+        # output head
+        self.lm_head = nn.Linear(embedding_size, vocab_size, bias=False)
+
+        # GPT-2 Dropout
+        self.drop = nn.Dropout(dropout)
+
+        # ====== weight tying ======
+        self.lm_head.weight = self.token_embedding.weight
+
+    def forward(self, x, mask=None):
+        """
+        x: (batch_size, seq_length)
+        """
+        batch_size, seq_len = x.shape
+
+        # 构建位置序列 [0, 1, 2, ..., seq_len-1]
+        positions = torch.arange(0, seq_len, device=x.device).unsqueeze(0)  # [1, seq_len]
+        positions = positions.expand(batch_size, seq_len)  # [bsz, seq_len]
+
+        # 嵌入相加 + dropout
+        tok_emb = self.token_embedding(x)                     # (batch_size, seq_len, emb_size)
+        pos_emb = self.position_embedding(positions)          # (batch_size, seq_len, emb_size)
+        hidden_states = self.drop(tok_emb + pos_emb)
+
+        # 依次输入 n 层TransformerBlock
+        for block in self.layers:
+            hidden_states = block(hidden_states, mask=mask)
+
+        # 最终的LayerNorm
+        hidden_states = self.ln_f(hidden_states)  # (batch_size, seq_len, emb_size)
+
+        # 通过lm_head (与token_embedding共享权重)
+        logits = self.lm_head(hidden_states)  # (batch_size, seq_len, vocab_size)
+        return logits
+
 def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda', max_length=128, warmup_ratio=0.03):
     model.to(device)
     model.train()
 
     # 配置日志输出到文件
     logging.basicConfig(
-        filename="app4.log",  # 指定日志文件路径
+        filename="app6.log",  # 指定日志文件路径
         level=logging.INFO,  # 设置日志级别
         format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -225,7 +311,7 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
-                model_name = f'model_{epoch + 1}_{save_intervals_idx + 1}0_percent.pth'
+                model_name = f'model2_{max_length}_{save_intervals_idx + 1}0_percent.pth'
                 # SAVE PATH
                 save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)

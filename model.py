@@ -181,6 +181,11 @@ class MyGPT(nn.Module):
         logits = self.lm_head(hidden_states)  # (batch_size, seq_len, vocab_size)
         return logits
 
+    def generate_square_subsequent_mask(self, size):
+        mask = torch.tril(torch.ones(size, size)).to(torch.float)
+        mask = mask.masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, 0.0)
+        return mask
+
 def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda', max_length=128, warmup_ratio=0.03):
     model.to(device)
     model.train()

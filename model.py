@@ -147,13 +147,10 @@ class MyGPT(nn.Module):
         self.ln_f = nn.LayerNorm(embedding_size)
 
         # output head
-        self.lm_head = nn.Linear(embedding_size, vocab_size, bias=False)
+        self.lm_head = nn.Linear(embedding_size, vocab_size)
 
         # GPT-2 Dropout
         self.drop = nn.Dropout(dropout)
-
-        # ====== weight tying ======
-        self.lm_head.weight = self.token_embedding.weight
 
     def forward(self, x, mask=None):
         """
@@ -163,7 +160,7 @@ class MyGPT(nn.Module):
 
         # 构建位置序列 [0, 1, 2, ..., seq_len-1]
         positions = torch.arange(0, seq_len, device=x.device).unsqueeze(0)  # [1, seq_len]
-        positions = positions.expand(batch_size, seq_len)  # [bsz, seq_len]
+        positions = positions.expand(batch_size, seq_len)  # [batch_size, seq_len]
 
         # 嵌入相加 + dropout
         tok_emb = self.token_embedding(x)                     # (batch_size, seq_len, emb_size)
@@ -177,7 +174,7 @@ class MyGPT(nn.Module):
         # 最终的LayerNorm
         hidden_states = self.ln_f(hidden_states)  # (batch_size, seq_len, emb_size)
 
-        # 通过lm_head (与token_embedding共享权重)
+        # 通过lm_head
         logits = self.lm_head(hidden_states)  # (batch_size, seq_len, vocab_size)
         return logits
 

@@ -1,11 +1,12 @@
 import time
-
+import logging
 import torch
 import torch.nn as nn
 
 from torch.utils.data import DataLoader
 from torch.cuda.amp import autocast, GradScaler
 from transformers import GPT2Tokenizer
+from transformers import get_scheduler
 
 
 # define transformer block
@@ -23,7 +24,7 @@ class TransformerBlock(nn.Module):
         # feed forward
         self.feed_forward = nn.Sequential(
             nn.Linear(embedding_size, forward_expansion * embedding_size),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(forward_expansion * embedding_size, embedding_size)
         )
 
@@ -90,12 +91,110 @@ class MyGPT2(nn.Module):
 
     def generate_square_subsequent_mask(self, size):
         mask = torch.tril(torch.ones(size, size)).to(torch.float)
+        mask = mask.masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, 0.0)
         return mask
 
 
-def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, device='cuda', max_length=512):
+class GPT2Block(nn.Module):
+    def __init__(self, embedding_size, num_heads, forward_expansion, dropout):
+        super(GPT2Block, self).__init__()
+
+        # multi-head attention
+        self.attn = nn.MultiheadAttention(embedding_size, num_heads, dropout=dropout, batch_first=True)
+        # GPT-2风格：在进入子层之前做LayerNorm
+        self.ln_1 = nn.LayerNorm(embedding_size)
+        self.ln_2 = nn.LayerNorm(embedding_size)
+
+        # feed forward: MLP
+        self.mlp = nn.Sequential(
+            nn.Linear(embedding_size, forward_expansion * embedding_size),
+            nn.GELU(),
+            nn.Linear(forward_expansion * embedding_size, embedding_size)
+        )
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        # x: shape (batch_size, seq_length, embedding_size)
+
+        # 1) Pre-LN, Self-Attention
+        x = self.ln_1(x)  # GPT-2 style: apply LN before attention
+        # batch_first=True，所以不需要转置
+        attn_out, _ = self.attn(x, x, x, attn_mask=mask)
+        x = x + self.drop(attn_out)  # 残差连接
+
+        # 2) Pre-LN, Feed Forward
+        m = self.ln_2(x)
+        mlp_out = self.mlp(m)
+        x = x + self.drop(mlp_out)
+
+        return x
+
+class MyGPT(nn.Module):
+    def __init__(self, vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length=1024):
+        super(MyGPT, self).__init__()
+
+        # token & position embeddings
+        self.token_embedding = nn.Embedding(vocab_size, embedding_size)
+        self.position_embedding = nn.Embedding(max_length, embedding_size)
+
+        # transformer blocks
+        self.layers = nn.ModuleList([
+            GPT2Block(embedding_size, num_heads, forward_expansion, dropout)
+            for _ in range(num_layers)
+        ])
+
+        # last layer norm (ln_f)
+        self.ln_f = nn.LayerNorm(embedding_size)
+
+        # output head
+        self.lm_head = nn.Linear(embedding_size, vocab_size)
+
+        # GPT-2 Dropout
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x, mask=None):
+        """
+        x: (batch_size, seq_length)
+        """
+        batch_size, seq_len = x.shape
+
+        # 构建位置序列 [0, 1, 2, ..., seq_len-1]
+        positions = torch.arange(0, seq_len, device=x.device).unsqueeze(0)  # [1, seq_len]
+        positions = positions.expand(batch_size, seq_len)  # [batch_size, seq_len]
+
+        # 嵌入相加 + dropout
+        tok_emb = self.token_embedding(x)                     # (batch_size, seq_len, emb_size)
+        pos_emb = self.position_embedding(positions)          # (batch_size, seq_len, emb_size)
+        hidden_states = self.drop(tok_emb + pos_emb)
+
+        # 依次输入 n 层TransformerBlock
+        for block in self.layers:
+            hidden_states = block(hidden_states, mask=mask)
+
+        # 最终的LayerNorm
+        hidden_states = self.ln_f(hidden_states)  # (batch_size, seq_len, emb_size)
+
+        # 通过lm_head
+        logits = self.lm_head(hidden_states)  # (batch_size, seq_len, vocab_size)
+        return logits
+
+    def generate_square_subsequent_mask(self, size):
+        mask = torch.tril(torch.ones(size, size)).to(torch.float)
+        mask = mask.masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, 0.0)
+        return mask
+
+def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda', max_length=128, warmup_ratio=0.03):
     model.to(device)
     model.train()
+
+    # 配置日志输出到文件
+    logging.basicConfig(
+        filename="app6.log",  # 指定日志文件路径
+        level=logging.INFO,  # 设置日志级别
+        format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
+        datefmt="%Y-%m-%d %H:%M:%S",
+        filemode="a"  # 追加模式（默认），可选 "w" 表示覆盖模式
+    )
 
     # Generate causal mask (causal attention mask) as a 2D matrix
     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)  # Shape: [seq_length, seq_length]
@@ -103,8 +202,20 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # DataLoader for batching
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+    # calculate warmup steps
+    total_steps = num_epochs * len(dataloader)
+    warmup_steps = int(warmup_ratio * total_steps)
+
     # Optimizer
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+
+    # learning rate scheduler
+    scheduler = get_scheduler(
+        name="cosine",                 # 学习率调度类型
+        optimizer=optimizer,
+        num_warmup_steps=warmup_steps, # Warm-up 阶段的步数
+        num_training_steps=total_steps # 总训练步数
+    )
 
     # Loss function
     criterion = nn.CrossEntropyLoss()
@@ -115,15 +226,20 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
     # Total number of batches
     total_batches = len(dataloader)
     print("total batches num: ", total_batches)
+    logging.info(f"total batches num: {total_batches}")
+    valid_x = valid_dataset["input_ids"].to(device)
+    valid_y = valid_dataset["labels"].to(device)
 
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
-    save_intervals_idx = 0  # 当前进度检查点索引
 
     # Training loop
     for epoch in range(num_epochs):
+        save_intervals_idx = 0  # 当前进度检查点索引
         total_loss = 0
         t1 = time.time()
+        t2 = time.time()
+
         for batch_idx, batch in enumerate(dataloader):
             # Extract inputs and targets from batch
             x = batch['input_ids'].to(device)  # Input token IDs
@@ -153,20 +269,56 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
             scaler.step(optimizer)
             scaler.update()
 
+            # update learning rate
+            scheduler.step()
+
             total_loss += loss.item()
 
             if batch_idx % 100 == 0:
-                print(f"batch 100 index {batch_idx}: total_avg_loss {total_loss/(batch_idx + 1):.3f}")
+                print(
+                    f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f} current_loss {loss}")
+                t3 = time.time()
+                print(f"Time taken for 100 batches: {t3 - t2:.2f} sec\n")
+                logging.info(
+                    f"batch 100 index {batch_idx}: total_avg_loss {total_loss / (batch_idx + 1):.3f} current_loss {loss}\n"
+                    f"Time taken for 100 batches: {t3 - t2:.2f} sec")
                 t2 = time.time()
-                print(f"Time taken for 100 batches: {t2 - t1:.2f} sec\n")
-                t1 = t2
+
+            if batch_idx % 6000 == 0:
+                with torch.no_grad():
+                    outputs = model(valid_x, mask=causal_mask)
+
+                    # Shift logits and labels for causal language modeling
+                    outputs = outputs[:, :-1, :].contiguous()
+                    valid_y1 = valid_y[:, 1:].contiguous()
+
+                    # Reshape outputs and targets for calculating loss
+                    outputs = outputs.view(-1, outputs.size(-1))
+                    valid_y1 = valid_y1.view(-1)
+
+                    # Compute loss
+                    loss = criterion(outputs, valid_y1)
+
+                print(
+                    f"batch 6000 index {batch_idx}: valid_loss {loss}")
+                t3 = time.time()
+                current_lr = scheduler.get_last_lr()[0]
+                print(f"Current Learning Rate: {current_lr:.8f}")
+                print(f"Time taken for evaluation: {t3 - t2:.2f} sec\n")
+                logging.info(
+                    f"batch 6000 index {batch_idx}: valid_loss {loss}\n"
+                    f"Current Learning Rate: {current_lr:.8f}\n"
+                    f"Time taken for evaluation: {t3 - t2:.2f} sec")
+                t2 = time.time()
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
-                model_name = f'model_{save_intervals_idx + 1}0_percent.pth'
-                save_path = f'./model/checkpoint/{model_name}'
+                model_name = f'model2_{max_length}_{save_intervals_idx + 1}0_percent.pth'
+                # SAVE PATH
+                save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)
                 print(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
+                logging.info(f"Model saved at {save_path} after {save_intervals_idx + 1}0% of training.")
 
                 # 新增：打印平均损失值
                 avg_loss_so_far = total_loss / (batch_idx + 1)
@@ -179,8 +331,9 @@ def train(model, dataset, num_epochs=3, batch_size=32, learning_rate=1e-4, devic
         print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {avg_loss:.4f}")
         print(f"Time taken for epoch: {time.time() - t1:.2f} sec\n")
 
-    # Save the model
-    torch.save(model.state_dict(), './model/model.pth')
+    # # Save the model
+    # # SAVE PATH
+    # torch.save(model.state_dict(), './model.pth')
 
 
 # Inference function
@@ -212,7 +365,7 @@ def predict(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, 
 
             # Decode the new token
             new_token = tokenizer.decode(next_token[0], skip_special_tokens=False)
-            generated_text += new_token
+            generated_text.append(new_token)
             print(new_token, end="")
 
             if eos_token_id is not None and next_token.item() == eos_token_id:
@@ -233,7 +386,7 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 512
+    max_length = 1024
     device = 'cuda'
 
     # instantiate the model

@@ -1,46 +1,124 @@
+import re
 import datasets
 from datasets import Dataset
 from transformers import GPT2Tokenizer
 
 
 # Load the pretraining dataset
-# def load_dataset(dataset_name, split):
-#     dataset = datasets.load_dataset(
-#         dataset_name,
-#         split=split
-#     )
-#
-#     filtered_dataset = dataset.filter(
-#         lambda example: example['meta'].get("redpajama_set_name") not in ["RedPajamaGithub", "RedPajamaArXiv",
-#                                                                           "RedPajamaStackExchange"],
-#         batched=False
-#     )
-#
-#     return filtered_dataset
-
-def load_dataset(dataset_name, split, trust_remote_code=True):
-    # 加载数据集
+def load_dataset(dataset_name, split, tokenizer, max_length=128):
     dataset = datasets.load_dataset(
         dataset_name,
         split=split,
-        trust_remote_code=trust_remote_code
+        trust_remote_code=True
     )
 
-    # 过滤掉 source 为 "github" 且长度小于 512 的数据
-    filtered_dataset = dataset.filter(
-        lambda example: example.get('source') != "github" and len(example.get('text', '')) >= 512,
+    def tokenize_and_chunk(example):
+        # tokenize the text
+        text = example["text"]
+        text = re.sub(r"\n{2,}", "\n", text)  # 将连续的两个或以上 \n 替换为一个 \n
+        tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
+
+        # split the tokens into chunks of max_length and pad the last chunk if needed
+        chunks = []
+        for i in range(0, len(tokens), max_length):
+            chunk = tokens[i:i + max_length]
+
+            # Ensure padding only happens for the last chunk
+            if len(chunk) == max_length:
+                chunks.append(chunk)
+            elif len(chunk) > max_length * 0.8:
+                chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
+                chunks.append(chunk)
+
+        return {"input_ids": chunks, "labels": chunks}
+
+    chunked_dataset = dataset.map(tokenize_and_chunk, batched=False)
+
+    # Flatten all chunks and create new columns for input_ids and labels
+    flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]
+    flattened_labels = [chunk for chunks in chunked_dataset["labels"] for chunk in chunks]
+
+    # Create a new dataset with input_ids and labels
+    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids, "labels": flattened_labels})
+
+    # Set the dataset format to PyTorch
+    new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
+
+    return new_dataset
+
+# Load the pretraining dataset
+def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, concat_size=20000):
+    # Step 1: Load dataset
+    dataset = datasets.load_dataset(
+        dataset_name,
+        split=split,
+        trust_remote_code=True
+    )
+
+    # Step 2: Concatenate text
+    def concatenate_text(examples):
+        # Split the text into batches of `concat_size` paragraphs
+        concatenated_text = []
+        buffer = []
+        for text in examples["text"]:
+            buffer.append(text)
+            if len(buffer) >= concat_size:  # If buffer reaches `concat_size`, join and append
+                concatenated_text.append("".join(buffer))
+                buffer = []
+        if buffer:  # Add remaining text if any
+            concatenated_text.append("".join(buffer))
+
+        return {"text": concatenated_text}
+
+    concatenated_dataset = dataset.map(
+        concatenate_text,
+        batched=True,
+        batch_size=1000,  # Adjust depending on memory
+        num_proc=8  # Number of parallel processes
+    )
+
+    # Step 3: Chunk tokenized text
+    def tokenize_and_chunk(examples):
+        text = examples["text"]
+        tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
+
+        chunks = []
+
+        # Slice with step_size=chunk_size
+        for i in range(0, len(tokens), max_length):
+            chunk = tokens[i:i + max_length]
+            # Ensure padding only happens for the last chunk
+            if len(chunk) == max_length:
+                chunks.append(chunk)
+            elif len(chunk) > max_length * 0.8:
+                chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
+                chunks.append(chunk)
+
+        return {"input_ids": chunks, "labels": chunks}
+
+    chunked_dataset = concatenated_dataset.map(
+        tokenize_and_chunk,
         batched=False
     )
 
-    return filtered_dataset
+    # Flatten all chunks and create new columns for input_ids and labels
+    flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]
+    flattened_labels = [chunk for chunks in chunked_dataset["labels"] for chunk in chunks]
 
+    # Create a new dataset with input_ids and labels
+    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids, "labels": flattened_labels})
 
-def load_dataset_wiki(tokenizer, max_length=128):
+    # Set the dataset format to PyTorch
+    new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
+
+    return new_dataset
+
+def load_dataset_wiki(split, tokenizer, max_length=128):
     # 加载Wikipedia英文数据集
     dataset = datasets.load_dataset(
         "wikimedia/wikipedia",
         "20231101.en",
-        split="train[:1]"
+        split=split
     )
 
     def tokenize_and_chunk(example):
@@ -76,7 +154,7 @@ def load_dataset_wiki(tokenizer, max_length=128):
 
 
 # tokenize corpus transfer text 2 tokens
-def tokenize_corpus(dataset, tokenizer, max_length=512):
+def tokenize_corpus(dataset, tokenizer, max_length=128):
     # Set pad token to eos token if pad token is None
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token

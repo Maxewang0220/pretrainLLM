@@ -39,7 +39,6 @@ if __name__ == "__main__":
 
     # calculate perplexity with cross entropy loss
     calculate_perplexity(model, tokenizer, device='cuda')
-    # ==============================================================#
 
     # Generate causal mask (causal attention mask) as a 2D matrix
     causal_mask = model.generate_square_subsequent_mask(max_length).to(device)

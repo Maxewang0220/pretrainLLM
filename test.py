@@ -37,13 +37,6 @@ if __name__ == "__main__":
     labels = valid_dataset["labels"].to(device)
     loss = torch.nn.CrossEntropyLoss()
 
-    # instantiate the model
-    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
-
-    model.load_state_dict(torch.load('model_1_30_percent.pth'))
-
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-
     # calculate perplexity with cross entropy loss
     calculate_perplexity(model, tokenizer, device='cuda')
     # ==============================================================#

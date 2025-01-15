@@ -37,6 +37,8 @@ if __name__ == "__main__":
     labels = valid_dataset["labels"].to(device)
     loss = torch.nn.CrossEntropyLoss()
 
+    # calcullate deals with one, so to process with 10 needed here or in the function itself
+
     # calculate perplexity with cross entropy loss
     calculate_perplexity(model, tokenizer, inputs, device='cuda')
 

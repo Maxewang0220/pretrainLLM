@@ -35,7 +35,8 @@ def calculate_perplexity(model, tokenizer, inputs, device='cuda'):
     print(f"target_probs: {target_probs}")
 
     # log_probs = target_probs.log()  # [B, T]
-    log_probs = (target_probs + 1e-9).log()
+    # log_probs = (target_probs + 1e-9).log()  # prevent log(0)
+    log_probs = (target_probs).log()
 
     # average log probability
     average_log_prob = log_probs.mean(dim=-1)  # [B]

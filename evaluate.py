@@ -2,6 +2,52 @@ from model import MyGPT2, predict
 from transformers import GPT2Tokenizer
 import torch
 
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+from transformers import GPT2Tokenizer
+
+
+# perplexity for language model
+def calculate_perplexity(model, tokenizer, device='cuda'):
+    model.to(device)
+    input = "I like apples on the tree"
+    encoded = tokenizer(input, return_tensors='pt')
+
+    input_ids = encoded["input_ids"].to(device)
+
+    logits = model(input_ids)
+
+    # softmax
+    probs = F.softmax(logits, dim=-1)
+
+    # select max probability
+    max_prob = torch.max(probs, dim=-1)
+
+    # 提取 max_prob 中的 indices
+    max_indices = max_prob.indices.squeeze(0)  # 移除 batch 维度
+    print(f"max_indices: {max_indices}")
+
+    # decode max_indices
+    max_tokens = [tokenizer.decode([idx]) for idx in max_indices.tolist()]
+    print(f"max_tokens: {max_tokens}")
+
+    # to get the probability of the target token
+    target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # [B, T]
+    print(f"target_probs: {target_probs}")
+
+    # log_probs = target_probs.log()  # [B, T]
+    log_probs = (target_probs + 1e-9).log()
+
+    # average log probability
+    average_log_prob = log_probs.mean(dim=-1)  # [B]
+    print(f"average_log_prob: {average_log_prob}")
+
+    # perplexity
+    perplexity = torch.exp(-average_log_prob)  # [B]
+    print(f"Perplexity: {perplexity.item()}")
+
+
 if __name__ == "__main__":
     # hyper parameters
     vocab_size = 50257

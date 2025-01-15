@@ -9,12 +9,10 @@ from transformers import GPT2Tokenizer
 
 
 # perplexity for language model
-def calculate_perplexity(model, tokenizer, device='cuda'):
+def calculate_perplexity(model, tokenizer, inputs, device='cuda'):
     model.to(device)
-    input = "I like apples on the tree"
-    encoded = tokenizer(input, return_tensors='pt')
 
-    input_ids = encoded["input_ids"].to(device)
+    input_ids = inputs
 
     logits = model(input_ids)
 

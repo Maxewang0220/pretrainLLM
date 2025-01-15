@@ -38,32 +38,32 @@ if __name__ == "__main__":
     loss = torch.nn.CrossEntropyLoss()
 
     # calculate perplexity with cross entropy loss
-    calculate_perplexity(model, tokenizer, device='cuda')
+    calculate_perplexity(model, tokenizer, inputs, device='cuda')
 
-    # Generate causal mask (causal attention mask) as a 2D matrix
-    causal_mask = model.generate_square_subsequent_mask(max_length).to(device)
-
-    # for i in range(10):
-    #     if i == 9:
-    #         print("text", i)
-    #         print("Context: ", inputs[i])
-    #         print(tokenizer.decode(inputs[i]))
-    #         print("Generated text: ")
-    #         output = model(inputs[i].unsqueeze(0).to(device), mask=causal_mask).squeeze(0)
-    #         print("output", torch.argmax(output, dim=1))
-    #         print(tokenizer.decode(torch.argmax(output, dim=1)))
-    #         # print("labels", labels[i][1:])
+    # # Generate causal mask (causal attention mask) as a 2D matrix
+    # causal_mask = model.generate_square_subsequent_mask(max_length).to(device)
     #
-    #         loss1 = loss(output[:-1], labels[i][1:])
-    #         print("loss", loss1)
-    #         print("\n")
-
-    text = "The process starts with Alice"
-    input = tokenizer(text, return_tensors='pt')["input_ids"].to(device)
-    print("input", input)
-    causal_mask = model.generate_square_subsequent_mask(len(input[0])).to(device)
-    output = model(input, mask=causal_mask).squeeze(0)
-    print(torch.argmax(output, dim=1))
-    print(tokenizer.decode(torch.argmax(output, dim=1)))
-
-    print(causal_mask)
+    # # for i in range(10):
+    # #     if i == 9:
+    # #         print("text", i)
+    # #         print("Context: ", inputs[i])
+    # #         print(tokenizer.decode(inputs[i]))
+    # #         print("Generated text: ")
+    # #         output = model(inputs[i].unsqueeze(0).to(device), mask=causal_mask).squeeze(0)
+    # #         print("output", torch.argmax(output, dim=1))
+    # #         print(tokenizer.decode(torch.argmax(output, dim=1)))
+    # #         # print("labels", labels[i][1:])
+    # #
+    # #         loss1 = loss(output[:-1], labels[i][1:])
+    # #         print("loss", loss1)
+    # #         print("\n")
+    #
+    # text = "The process starts with Alice"
+    # input = tokenizer(text, return_tensors='pt')["input_ids"].to(device)
+    # print("input", input)
+    # causal_mask = model.generate_square_subsequent_mask(len(input[0])).to(device)
+    # output = model(input, mask=causal_mask).squeeze(0)
+    # print(torch.argmax(output, dim=1))
+    # print(tokenizer.decode(torch.argmax(output, dim=1)))
+    #
+    # print(causal_mask)

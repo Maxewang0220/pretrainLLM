@@ -7,44 +7,45 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from transformers import GPT2Tokenizer
 
-
 # perplexity for language model
+import torch
+import torch.nn.functional as F
+
+
 def calculate_perplexity(model, tokenizer, inputs, device='cuda'):
     model.to(device)
 
-    input_ids = inputs
+    input_ids = inputs.to(device)
 
-    logits = model(input_ids)
+    # get logits
+    with torch.no_grad():
+        logits = model(input_ids).logits  # (batch_size, seq_len, vocab_size)
 
     # softmax
-    probs = F.softmax(logits, dim=-1)
+    probs = F.softmax(logits, dim=-1)  # (batch_size, seq_len, vocab_size)
 
-    # select max probability
-    max_prob = torch.max(probs, dim=-1)
+    # get the probability of the target word
+    target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # (batch_size, seq_len)
 
-    # 提取 max_prob 中的 indices
-    max_indices = max_prob.indices.squeeze(0)  # 移除 batch 维度
-    print(f"max_indices: {max_indices}")
+    # 避免 log(0) 的问题，添加一个小的 epsilon
+    epsilon = 1e-9
+    log_probs = torch.log(target_probs + epsilon)  # (batch_size, seq_len)
 
-    # decode max_indices
-    max_tokens = [tokenizer.decode([idx]) for idx in max_indices.tolist()]
-    print(f"max_tokens: {max_tokens}")
+    # 计算每个样本的平均 log 概率
+    average_log_prob = log_probs.mean(dim=-1)  # (batch_size)
 
-    # to get the probability of the target token
-    target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # [B, T]
-    print(f"target_probs: {target_probs}")
+    # 计算 perplexity
+    perplexity = torch.exp(-average_log_prob)  # (batch_size)
 
-    # log_probs = target_probs.log()  # [B, T]
-    # log_probs = (target_probs + 1e-9).log()  # prevent log(0)
-    log_probs = (target_probs).log()
+    # 返回平均 perplexity
+    return perplexity.mean().item()
 
-    # average log probability
-    average_log_prob = log_probs.mean(dim=-1)  # [B]
-    print(f"average_log_prob: {average_log_prob}")
-
-    # perplexity
-    perplexity = torch.exp(-average_log_prob)  # [B]
-    print(f"Perplexity: {perplexity.item()}")
+    # 示例调用
+    # tokenizer = ...  # 你的 tokenizer
+    # model = ...      # 你的模型
+    # inputs = tokenizer("示例文本", return_tensors="pt")["input_ids"]
+    # perplexity = calculate_perplexity(model, tokenizer, inputs)
+    # print(f"Perplexity: {perplexity}")
 
     # def Q_A_probability(model, tokenizer, inputs, device='cuda')
     model.to(device)

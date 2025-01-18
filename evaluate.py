@@ -46,6 +46,12 @@ def calculate_perplexity(model, tokenizer, inputs, device='cuda'):
     perplexity = torch.exp(-average_log_prob)  # [B]
     print(f"Perplexity: {perplexity.item()}")
 
+    # def Q_A_probability(model, tokenizer, inputs, device='cuda')
+    model.to(device)
+
+
+# def generate_n_sentences(model, tokenizer, device, sentence_num=10):
+
 
 if __name__ == "__main__":
     # hyper parameters
@@ -64,7 +70,7 @@ if __name__ == "__main__":
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
 
-    model.load_state_dict(torch.load('model_webtext.pth'))
+    model.load_state_dict(torch.load('model_256_100_percent.pth'))
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 

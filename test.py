@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length).to(device)
 
-    model.load_state_dict(torch.load('model_webtext.pth'))
+    model.load_state_dict(torch.load('model_256_100_percent.pth'))
 
     model.eval()
 
@@ -40,7 +40,8 @@ if __name__ == "__main__":
     # calcullate deals with one, so to process with 10 needed here or in the function itself
 
     # calculate perplexity with cross entropy loss
-    calculate_perplexity(model, tokenizer, inputs, device='cuda')
+    perplexity = calculate_perplexity(model, inputs, device)
+    print("mean perplexity", perplexity)
 
     # # Generate causal mask (causal attention mask) as a 2D matrix
     # causal_mask = model.generate_square_subsequent_mask(max_length).to(device)

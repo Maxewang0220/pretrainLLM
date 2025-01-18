@@ -12,46 +12,46 @@ import torch
 import torch.nn.functional as F
 
 
-def calculate_perplexity(model, tokenizer, inputs, device='cuda'):
+def calculate_perplexity(model, inputs, device='cuda'):
     model.to(device)
 
     input_ids = inputs.to(device)
 
     # get logits
     with torch.no_grad():
-        logits = model(input_ids).logits  # (batch_size, seq_len, vocab_size)
+        logits = model(input_ids)  # (batch_size, seq_len, vocab_size)
 
     # softmax
     probs = F.softmax(logits, dim=-1)  # (batch_size, seq_len, vocab_size)
 
     # get the probability of the target word
     target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # (batch_size, seq_len)
+    # to avoid log(0) issue, add a small epsilon
+    if torch.any(target_probs == 0):
+        print("Warning: target_probs contains 0 values")
 
     # 避免 log(0) 的问题，添加一个小的 epsilon
-    epsilon = 1e-9
+    # epsilon = 1e-10
+    epsilon = 0
     log_probs = torch.log(target_probs + epsilon)  # (batch_size, seq_len)
+
+    print(f"log_probs: {log_probs}")
 
     # 计算每个样本的平均 log 概率
     average_log_prob = log_probs.mean(dim=-1)  # (batch_size)
 
     # 计算 perplexity
     perplexity = torch.exp(-average_log_prob)  # (batch_size)
+    print(f"Perplexity: {perplexity}")
 
     # 返回平均 perplexity
     return perplexity.mean().item()
 
-    # 示例调用
-    # tokenizer = ...  # 你的 tokenizer
-    # model = ...      # 你的模型
-    # inputs = tokenizer("示例文本", return_tensors="pt")["input_ids"]
-    # perplexity = calculate_perplexity(model, tokenizer, inputs)
-    # print(f"Perplexity: {perplexity}")
-
     # def Q_A_probability(model, tokenizer, inputs, device='cuda')
-    model.to(device)
+    # model.to(device)
 
 
-# def generate_n_sentences(model, tokenizer, device, sentence_num=10):
+def generate_n_sentences(model, tokenizer, device, sentence_num=10):
 
 
 if __name__ == "__main__":

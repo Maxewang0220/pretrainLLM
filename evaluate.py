@@ -12,6 +12,7 @@ import torch
 import torch.nn.functional as F
 
 
+# perplexity; 1st part of the evaluation
 def calculate_perplexity(model, inputs, device='cuda'):
     model.to(device)
 
@@ -47,11 +48,44 @@ def calculate_perplexity(model, inputs, device='cuda'):
     # 返回平均 perplexity
     return perplexity.mean().item()
 
-    # def Q_A_probability(model, tokenizer, inputs, device='cuda')
-    # model.to(device)
+
+# def Q_A_probability(model, tokenizer, inputs, device='cuda')
 
 
-def generate_n_sentences(model, tokenizer, device, sentence_num=10):
+# model.to(device)
+# https://huggingface.co/thanhnew2001/everything
+
+# 3nd part of the evaluation
+def generate_write_n_sentences(model, tokenizer, device='cuda', num_sentence=10):
+    model.to(device)
+    # load the CNN/DailyMail dataset as prompt
+    cnn_dataset = load_dataset("ccdv/cnn_dailymail", "3.0.0", split="train", trust_remote_code=True)
+
+    # write to a file
+    with open("generated_sentences.txt", "w") as f:
+        f.write("Generated sentences:\n")
+        for i in range(num_sentence):
+            sentence_idx = "This is sentence " + str(i) + ":\n"
+            # original text
+            input_text = cnn_dataset[i]["article"]
+            print("Context: ", input_text, '\n')
+            # tokenize and truncate to max_length tokens
+            encoded = tokenizer(input_text, truncation=True, max_length=200, return_tensors="pt")
+
+            # decode the tokenized input text
+            input_text = tokenizer.decode(encoded["input_ids"][0], skip_special_tokens=True)
+            print("input_text: ", input_text, '\n')
+
+            # string
+            print("Generated text: ")
+            generated_text = predict(model, input_text, tokenizer, max_length=50, eos_token_id=tokenizer.eos_token_id,
+                                     device='cuda')
+            print("\n")
+            # char lists to string sentence
+            generated_text = ''.join(generated_text).strip()
+
+            f.write(sentence_idx)
+            f.write(generated_text + "\n")
 
 
 if __name__ == "__main__":

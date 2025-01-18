@@ -4,7 +4,7 @@ from model import MyGPT2, predict
 from transformers import GPT2Tokenizer
 import torch
 from corpus_reader import load_dataset
-from evaluate import calculate_perplexity
+from evaluate import calculate_perplexity, generate_write_n_sentences
 
 if __name__ == "__main__":
     # hyper parameters
@@ -40,9 +40,12 @@ if __name__ == "__main__":
     # calcullate deals with one, so to process with 10 needed here or in the function itself
 
     # calculate perplexity with cross entropy loss
-    perplexity = calculate_perplexity(model, inputs, device)
-    print("mean perplexity", perplexity)
+    mean_perplexity = calculate_perplexity(model, inputs, device)
+    print("mean perplexity", mean_perplexity)
 
+    # generate and write n sentences
+    # generate_write_n_sentences(model, tokenizer, device, max_length, num_sentence=10)
+    generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
     # # Generate causal mask (causal attention mask) as a 2D matrix
     # causal_mask = model.generate_square_subsequent_mask(max_length).to(device)
     #

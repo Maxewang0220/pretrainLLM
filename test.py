@@ -9,6 +9,7 @@ from corpus_reader import load_dataset
 from evaluate import calculate_perplexity, generate_write_n_sentences
 from Q_A import qa_data
 from evaluate import get_next_token_distributions
+import numpy as np
 
 if __name__ == "__main__":
     # hyper parameters
@@ -49,18 +50,13 @@ if __name__ == "__main__":
 
     # 2nd calculate Q_A token probability
     # Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data)
-    input_sentence = "The capital of France is"
+    # input_sentence = "The capital of France is"
 
-    distributions = get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10)
-
+    get_next_token_distributions(model, tokenizer, max_tokens=10, device=device)
     # for i, probs in enumerate(distributions):
     #     print(f"Token {i + 1} probability distribution:")
     #     print(probs[:10])  # 打印词汇表中前 10 个词的概率
     #     print()
-    import numpy as np
-
-    token_distributions_array = np.array(distributions)
-    print(token_distributions_array.shape)  # 输出 (10, 50257)
 
     # # 3rd generate and write n sentences
     # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)

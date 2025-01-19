@@ -70,12 +70,23 @@ def Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data):
     logits = model(real_answer["input_ids"].to(device))
 
 
-def get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10, device='cuda'):
+def get_next_token_distributions(model, tokenizer, max_tokens=10, device='cuda', qa_data=qa_data):
     model.to(device)
     model.eval()
 
+    # get a random question and answer pair
+    random_qa = random.choice(qa_data)
+    question = random_qa["question"]
+    real_answer = random_qa["answer"]
+    print("question is : ", question)
+    print("real_answer is : ", real_answer)
+
+    answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(
+        device)
+    print("answer_tokens: ", answer_tokens[0])  # 输出 answer_tokens:  tensor([ 464
+
     # Tokenize input sentence and move to device
-    input_sequence = tokenizer(input_sentence, return_tensors="pt")["input_ids"].to(device)
+    input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
     generated_sequence = input_sequence.clone()
 
     token_distributions = []  # Store probability distributions for each generated token
@@ -98,8 +109,20 @@ def get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10
             # Append the predicted token to the sequence
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
 
+    # convert to numpy array
+    # convert to numpy array
     token_distributions_array = np.array(token_distributions)
     print(token_distributions_array.shape)  # 输出 (10, 50257)
+
+    # Convert answer_tokens to CPU and NumPy array
+    answer_tokens = answer_tokens.cpu().numpy()  # 转为 NumPy 数组
+    print("answer_tokens: ", answer_tokens)  # 输出 answer_tokens:  [464]
+    print("len(answer_tokens): ", len(answer_tokens))  # 输出 len(answer_tokens):  1
+
+    # get the probability of the target token
+    selected_probs = token_distributions_array[:, answer_tokens]  # Shape: (max_tokens, len(answer_tokens))
+    print("Selected probabilities:\n", selected_probs)
+    print("Shape: ", selected_probs.shape)
 
     return token_distributions
 

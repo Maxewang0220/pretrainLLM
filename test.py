@@ -53,10 +53,6 @@ if __name__ == "__main__":
     # input_sentence = "The capital of France is"
 
     get_next_token_distributions(model, tokenizer, max_tokens=10, device=device)
-    # for i, probs in enumerate(distributions):
-    #     print(f"Token {i + 1} probability distribution:")
-    #     print(probs[:10])  # 打印词汇表中前 10 个词的概率
-    #     print()
 
     # # 3rd generate and write n sentences
     # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)

@@ -83,7 +83,13 @@ def get_next_token_distributions(model, tokenizer, max_tokens=10, device='cuda',
 
     answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(
         device)
-    print("answer_tokens: ", answer_tokens[0])  # 输出 answer_tokens:  tensor([ 464
+    print("answer_tokens: ", answer_tokens[0])
+    print("shape of answer_tokens: ", answer_tokens.shape)
+
+    # 假设 answer_tokens 是通过 tokenizer 得到的 input_ids
+    answer_tokens_ids = answer_tokens[0].tolist()  # 转换为列表
+    tokens = tokenizer.convert_ids_to_tokens(answer_tokens_ids)  # 转换为 token
+    print("Tokens: ", tokens)
 
     # Tokenize input sentence and move to device
     input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)

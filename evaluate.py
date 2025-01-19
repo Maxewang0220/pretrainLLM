@@ -11,6 +11,9 @@ from transformers import GPT2Tokenizer
 import torch
 import torch.nn.functional as F
 
+from Q_A import qa_data
+import random
+
 
 # perplexity; 1st part of the evaluation
 def calculate_perplexity(model, inputs, device='cuda'):
@@ -49,7 +52,13 @@ def calculate_perplexity(model, inputs, device='cuda'):
     return perplexity.mean().item()
 
 
-# def Q_A_probability(model, tokenizer, inputs, device='cuda')
+def Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data):
+    model.to(device)
+    random_qa = random.choice(qa_data)
+    question = random_qa["question"]
+    real_answer = random_qa["answer"]
+    real_answer_tokens = tokenizer(answer, truncation=True, max_length=200, return_tensors="pt")
+    logits = model(real_["input_ids"].to(device))
 
 
 # model.to(device)
@@ -58,11 +67,35 @@ def calculate_perplexity(model, inputs, device='cuda'):
 # 3nd part of the evaluation
 def generate_write_n_sentences(model, tokenizer, device='cuda', num_sentence=10):
     model.to(device)
+
+    rate_prompt = """You are a language expert tasked with evaluating a set of generated sentences. Please rate each sentence based on the following criteria:
+Grammar and Syntax (1-10): Does the sentence follow proper grammar and syntax rules?
+Semantic Clarity (1-10): Is the meaning of the sentence clear and easy to understand?
+Contextual Relevance (1-10): Is the sentence relevant to the given topic or theme?
+Creativity and Style (1-10): Does the sentence demonstrate creativity or an appropriate style?
+For each sentence, provide a detailed score (1-10) for each category, along with a brief explanation for your ratings.
+
+Here are the sentences to evaluate:
+
+[Sentence 1]
+[Sentence 2]
+[Sentence 3]
+Please respond in the following format:
+
+Sentence 1:
+
+Grammar and Syntax: X/10
+Semantic Clarity: X/10
+Contextual Relevance: X/10
+Creativity and Style: X/10
+Reasoning: [Provide a detailed explanation]"""
+
     # load the CNN/DailyMail dataset as prompt
     cnn_dataset = load_dataset("ccdv/cnn_dailymail", "3.0.0", split="train", trust_remote_code=True)
 
     # write to a file
     with open("generated_sentences.txt", "w") as f:
+        f.write(rate_prompt)
         f.write("Generated sentences:\n")
         for i in range(num_sentence):
             sentence_idx = "This is sentence " + str(i) + ":\n"

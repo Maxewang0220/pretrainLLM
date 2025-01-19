@@ -53,10 +53,15 @@ if __name__ == "__main__":
 
     distributions = get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10)
 
-    for i, probs in enumerate(distributions):
-        print(f"Token {i + 1} probability distribution:")
-        print(probs[:10])  # 打印词汇表中前 10 个词的概率
-        print()
+    # for i, probs in enumerate(distributions):
+    #     print(f"Token {i + 1} probability distribution:")
+    #     print(probs[:10])  # 打印词汇表中前 10 个词的概率
+    #     print()
+    import numpy as np
+
+    token_distributions_array = np.array(distributions)
+    print(token_distributions_array.shape)  # 输出 (10, 50257)
+
     # # 3rd generate and write n sentences
     # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
 

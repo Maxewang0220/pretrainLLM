@@ -14,6 +14,7 @@ import torch.nn.functional as F
 
 from Q_A import qa_data
 import random
+import numpy as np
 
 
 # perplexity; 1st part of the evaluation
@@ -96,6 +97,9 @@ def get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10
 
             # Append the predicted token to the sequence
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+
+    token_distributions_array = np.array(token_distributions)
+    print(token_distributions_array.shape)  # 输出 (10, 50257)
 
     return token_distributions
 

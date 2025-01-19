@@ -1,3 +1,5 @@
+from itertools import takewhile
+
 from numpy.ma.core import masked
 
 from model import MyGPT2, predict
@@ -6,6 +8,7 @@ import torch
 from corpus_reader import load_dataset
 from evaluate import calculate_perplexity, generate_write_n_sentences
 from Q_A import qa_data
+from evaluate import get_next_token_distributions
 
 if __name__ == "__main__":
     # hyper parameters
@@ -41,14 +44,21 @@ if __name__ == "__main__":
     # calcullate deals with one, so to process with 10 needed here or in the function itself
 
     # 1st stcalculate perplexity with cross entropy loss
-    mean_perplexity = calculate_perplexity(model, inputs, device)
-    print("mean perplexity", mean_perplexity)
+    # mean_perplexity = calculate_perplexity(model, inputs, device)
+    # print("mean perplexity", mean_perplexity)
 
     # 2nd calculate Q_A token probability
-    Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data)
+    # Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data)
+    input_sentence = "The capital of France is"
 
-    # 3rd generate and write n sentences
-    generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
+    distributions = get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10)
+
+    for i, probs in enumerate(distributions):
+        print(f"Token {i + 1} probability distribution:")
+        print(probs[:10])  # 打印词汇表中前 10 个词的概率
+        print()
+    # # 3rd generate and write n sentences
+    # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
 
     # # Generate causal mask (causal attention mask) as a 2D matrix
     # causal_mask = model.generate_square_subsequent_mask(max_length).to(device)

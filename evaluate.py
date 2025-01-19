@@ -6,6 +6,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from transformers import GPT2Tokenizer
+from torch.nn.functional import softmax
 
 # perplexity for language model
 import torch
@@ -54,11 +55,49 @@ def calculate_perplexity(model, inputs, device='cuda'):
 
 def Q_A_probability(model, tokenizer, inputs, device='cuda', qa_data=qa_data):
     model.to(device)
+    # get a random question and answer pair
     random_qa = random.choice(qa_data)
+
     question = random_qa["question"]
     real_answer = random_qa["answer"]
-    real_answer_tokens = tokenizer(answer, truncation=True, max_length=200, return_tensors="pt")
-    logits = model(real_["input_ids"].to(device))
+
+    generated_sequence = predict(model, question, tokenizer, max_length=50, eos_token_id=tokenizer.eos_token_id,
+                                 device=device)
+
+    # tokenize the question and answer
+    real_answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")
+    logits = model(real_answer["input_ids"].to(device))
+
+
+def get_next_token_distributions(model, input_sentence, tokenizer, max_tokens=10, device='cuda'):
+    model.to(device)
+    model.eval()
+
+    # Tokenize input sentence and move to device
+    input_sequence = tokenizer(input_sentence, return_tensors="pt")["input_ids"].to(device)
+    generated_sequence = input_sequence.clone()
+
+    token_distributions = []  # Store probability distributions for each generated token
+
+    with torch.no_grad():
+        for _ in range(max_tokens):
+            # Forward pass to get logits
+            outputs = model(generated_sequence)
+            logits = outputs[:, -1, :]  # Get the logits for the last token in the sequence
+
+            # Convert logits to probabilities
+            probs = softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
+
+            # Store the probability distribution
+            token_distributions.append(probs[0].cpu().numpy())
+
+            # Get the next token (argmax or sampling, here using argmax)
+            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+
+            # Append the predicted token to the sequence
+            generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+
+    return token_distributions
 
 
 # model.to(device)

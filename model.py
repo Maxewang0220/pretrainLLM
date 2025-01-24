@@ -129,6 +129,7 @@ class GPT2Block(nn.Module):
 
         return x
 
+
 class MyGPT(nn.Module):
     def __init__(self, vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length=1024):
         super(MyGPT, self).__init__()
@@ -163,8 +164,8 @@ class MyGPT(nn.Module):
         positions = positions.expand(batch_size, seq_len)  # [batch_size, seq_len]
 
         # 嵌入相加 + dropout
-        tok_emb = self.token_embedding(x)                     # (batch_size, seq_len, emb_size)
-        pos_emb = self.position_embedding(positions)          # (batch_size, seq_len, emb_size)
+        tok_emb = self.token_embedding(x)  # (batch_size, seq_len, emb_size)
+        pos_emb = self.position_embedding(positions)  # (batch_size, seq_len, emb_size)
         hidden_states = self.drop(tok_emb + pos_emb)
 
         # 依次输入 n 层TransformerBlock
@@ -183,7 +184,9 @@ class MyGPT(nn.Module):
         mask = mask.masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, 0.0)
         return mask
 
-def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda', max_length=128, warmup_ratio=0.03):
+
+def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda',
+          max_length=128, warmup_ratio=0.03):
     model.to(device)
     model.train()
 
@@ -211,10 +214,10 @@ def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_r
 
     # learning rate scheduler
     scheduler = get_scheduler(
-        name="cosine",                 # 学习率调度类型
+        name="cosine",  # 学习率调度类型
         optimizer=optimizer,
-        num_warmup_steps=warmup_steps, # Warm-up 阶段的步数
-        num_training_steps=total_steps # 总训练步数
+        num_warmup_steps=warmup_steps,  # Warm-up 阶段的步数
+        num_training_steps=total_steps  # 总训练步数
     )
 
     # Loss function
@@ -359,6 +362,67 @@ def predict(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, 
             # Get the predicted next token (take the last token in the sequence)
             next_token_logits = outputs[:, -1, :]
             next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+
+            # Append the predicted token to the generated sequence
+            generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+
+            # Decode the new token
+            new_token = tokenizer.decode(next_token[0], skip_special_tokens=False)
+            generated_text.append(new_token)
+            print(new_token, end="")
+
+            if eos_token_id is not None and next_token.item() == eos_token_id:
+                break
+
+    print("\n")
+    return generated_text
+
+
+# modified predict function
+def predict_with_sampling(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, device='cuda', top_k=10,
+                          top_p=0.95, temperature=1.1):
+    """
+    Predict function using Top-K and Top-P sampling.
+    """
+    model.to(device)
+    model.eval()
+
+    if tokenizer is None:
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+
+    # Encode input text to token IDs
+    input_sequence = tokenizer(input_sequence, return_tensors="pt")
+    generated_sequence = input_sequence["input_ids"].to(device)
+
+    # Generate text
+    generated_text = []
+
+    with torch.no_grad():
+        for _ in range(max_length):
+            # Forward pass
+            outputs = model(generated_sequence)
+
+            # Get the logits of the last token
+            logits = outputs[:, -1, :]  # Extract logits for sampling
+            logits = logits / temperature  # Adjust logits using temperature
+
+            # Apply Top-K and Top-P sampling
+            sorted_logits, sorted_indices = torch.sort(logits, descending=True, dim=-1)
+            cumulative_probs = torch.cumsum(torch.softmax(sorted_logits, dim=-1), dim=-1)
+
+            # Remove tokens with cumulative probability above the threshold (Top-P)
+            sorted_indices_to_remove = cumulative_probs > top_p
+            if top_k > 0:
+                sorted_indices_to_remove[:, top_k:] = True  # Keep only Top-K tokens
+            sorted_logits[sorted_indices_to_remove] = -float('Inf')
+
+            # Sample from the filtered distribution
+            probabilities = torch.softmax(sorted_logits, dim=-1)
+            probabilities = probabilities.clamp(min=1e-9)  # make sure no zero division
+            sampled_index_in_sorted = torch.multinomial(probabilities, num_samples=1)  # Sample index in the sorted list
+
+            # Map the sampled index back to the original logits
+            next_token = sorted_indices.gather(1, sampled_index_in_sorted)  # Map to original index
 
             # Append the predicted token to the generated sequence
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)

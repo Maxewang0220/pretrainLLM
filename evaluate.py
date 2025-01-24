@@ -1,4 +1,4 @@
-from model import MyGPT2, predict
+from model import MyGPT2, MyGPT, predict, predict_with_sampling
 from transformers import GPT2Tokenizer
 import torch
 
@@ -19,7 +19,7 @@ if __name__ == "__main__":
     # instantiate the model
     model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
 
-    model.load_state_dict(torch.load('model_webtext.pth'))
+    model.load_state_dict(torch.load('model2_256_100_percent.pth'))
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
@@ -32,6 +32,6 @@ if __name__ == "__main__":
         print("Generated text: ")
 
         # inference
-        generated_sequence = predict(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
-                                     eos_token_id=tokenizer.eos_token_id,
-                                     device=device)
+        generated_sequence = predict_with_sampling(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
+                                                   eos_token_id=tokenizer.eos_token_id,
+                                                   device=device)

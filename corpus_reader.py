@@ -15,7 +15,6 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
     def tokenize_and_chunk(example):
         # tokenize the text
         text = example["text"]
-        text = re.sub(r"\n{2,}", "\n", text)  # 将连续的两个或以上 \n 替换为一个 \n
         tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
 
         # split the tokens into chunks of max_length and pad the last chunk if needed
@@ -45,6 +44,7 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
     new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
 
     return new_dataset
+
 
 # Load the pretraining dataset
 def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, concat_size=20000):
@@ -112,6 +112,7 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, conc
     new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
 
     return new_dataset
+
 
 def load_dataset_wiki(split, tokenizer, max_length=128):
     # 加载Wikipedia英文数据集

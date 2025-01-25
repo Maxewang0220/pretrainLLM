@@ -1,4 +1,3 @@
-import re
 import datasets
 from datasets import Dataset
 from transformers import GPT2Tokenizer
@@ -47,7 +46,7 @@ def load_dataset(dataset_name, split, tokenizer, max_length=128):
 
 
 # Load the pretraining dataset
-def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, concat_size=20000):
+def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=512, concat_size=20480):
     # Step 1: Load dataset
     dataset = datasets.load_dataset(
         dataset_name,
@@ -74,7 +73,7 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, conc
         concatenate_text,
         batched=True,
         batch_size=1000,  # Adjust depending on memory
-        num_proc=8  # Number of parallel processes
+        num_proc=16  # Number of parallel processes
     )
 
     # Step 3: Chunk tokenized text
@@ -94,7 +93,7 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, conc
                 chunk += [tokenizer.eos_token_id] * (max_length - len(chunk))
                 chunks.append(chunk)
 
-        return {"input_ids": chunks, "labels": chunks}
+        return {"input_ids": chunks}
 
     chunked_dataset = concatenated_dataset.map(
         tokenize_and_chunk,
@@ -103,13 +102,14 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=128, conc
 
     # Flatten all chunks and create new columns for input_ids and labels
     flattened_input_ids = [chunk for chunks in chunked_dataset["input_ids"] for chunk in chunks]
-    flattened_labels = [chunk for chunks in chunked_dataset["labels"] for chunk in chunks]
 
     # Create a new dataset with input_ids and labels
-    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids, "labels": flattened_labels})
+    new_dataset = Dataset.from_dict({"input_ids": flattened_input_ids})
 
     # Set the dataset format to PyTorch
-    new_dataset.set_format(type="torch", columns=["input_ids", "labels"])
+    new_dataset.set_format(type="torch", columns=["input_ids"])
+
+    new_dataset.save_to_disk("./bookcorpus_split")
 
     return new_dataset
 

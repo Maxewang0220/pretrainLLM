@@ -111,6 +111,8 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=512, conc
 
     new_dataset.save_to_disk("./bookcorpus_split")
 
+    print("save successfully")
+
     return new_dataset
 
 

@@ -29,12 +29,15 @@ if __name__ == '__main__':
         device)
     model = torch.compile(model)
 
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-
     try:
-        dataset = load_from_disk("./bookcorpus_10000_512tokens")
+        dataset = load_from_disk("./bookcorpus_split")
     except FileNotFoundError:
-        dataset = load_dataset_bookcorpus("bookcorpus/bookcorpus", split="train", tokenizer=tokenizer, max_length=max_length)
+        tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+        dataset = load_dataset_bookcorpus("bookcorpus/bookcorpus", split="train", tokenizer=tokenizer,
+                                          max_length=max_length)
+
+    print("finish")
+    exit()
 
     dataset = dataset.shuffle(seed=32)
 

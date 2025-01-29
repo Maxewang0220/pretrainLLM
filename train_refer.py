@@ -36,6 +36,15 @@ if __name__ == '__main__':
 
     num_epochs = 1
 
+    # 配置日志输出到文件
+    logging.basicConfig(
+        filename="app.log",  # 指定日志文件路径
+        level=logging.INFO,  # 设置日志级别
+        format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
+        datefmt="%Y-%m-%d %H:%M:%S",
+        filemode="a"  # 追加模式（默认），可选 "w" 表示覆盖模式
+    )
+
     if torch.cuda.is_available():
         device = 'cuda'
     else:
@@ -83,15 +92,6 @@ if __name__ == '__main__':
         optimizer=optimizer,
         num_warmup_steps=total_batches * warm_up,  # Warm-up 阶段的步数
         num_training_steps=total_batches  # 总训练步数
-    )
-
-    # 配置日志输出到文件
-    logging.basicConfig(
-        filename="app.log",  # 指定日志文件路径
-        level=logging.INFO,  # 设置日志级别
-        format="%(asctime)s [%(levelname)s] %(message)s",  # 设置日志格式
-        datefmt="%Y-%m-%d %H:%M:%S",
-        filemode="a"  # 追加模式（默认），可选 "w" 表示覆盖模式
     )
 
     model.train()

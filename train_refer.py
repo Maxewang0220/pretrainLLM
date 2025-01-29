@@ -1,26 +1,13 @@
 from datasets import load_from_disk
 from torch.utils.data import DataLoader
 from transformers import get_scheduler
-from model import GPT2
+from model_refer import GPT2
 import logging
 import torch
 from torch.nn import functional as F
 import math
 import time
 
-def get_lr(it, warmup_iters, learning_rate, lr_decay_iters):
-    min_lr = learning_rate/10
-    # 1) linear warmup for warmup_iters steps
-    if it < warmup_iters:
-        return learning_rate * it / warmup_iters
-    # 2) if it > lr_decay_iters, return min learning rate
-    if it > lr_decay_iters:
-        return min_lr
-    # 3) in between, use cosine decay down to min learning rate
-    decay_ratio = (it - warmup_iters) / (lr_decay_iters - warmup_iters)
-    assert 0 <= decay_ratio <= 1
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio)) # coeff ranges 0..1
-    return min_lr + coeff * (learning_rate - min_lr)
 
 @torch.no_grad()
 def accuracy(logits, targets):
@@ -29,6 +16,7 @@ def accuracy(logits, targets):
     compare = torch.eq(prediction, targets).float()
     accuracy = torch.mean(compare).item()
     return accuracy
+
 
 if __name__ == '__main__':
     no_mixed = False
@@ -46,8 +34,6 @@ if __name__ == '__main__':
     warm_up = 0.03
 
     num_epochs = 1
-    
-
 
     if torch.cuda.is_available():
         device = 'cuda'
@@ -68,22 +54,23 @@ if __name__ == '__main__':
     if not no_mixed:
         mixed = True
         dtype = 'float16'
-    
+
     model = GPT2(
-        vocab_size = vocab_size, 
-        d_model = embedding_size, 
-        block_size = max_length, 
-        embed_pdrop = embedding_dropout,
-        num_heads = num_heads,
-        dff = forward_expansion,
-        attn_pdrop = attention_dropout,
-        resid_pdrop = residual_dropout,
-        dropout = feedforward_dropout,
-        num_layer = num_layers)
-    
+        vocab_size=vocab_size,
+        d_model=embedding_size,
+        block_size=max_length,
+        embed_pdrop=embedding_dropout,
+        num_heads=num_heads,
+        dff=forward_expansion,
+        attn_pdrop=attention_dropout,
+        resid_pdrop=residual_dropout,
+        dropout=feedforward_dropout,
+        num_layer=num_layers)
+
     model.to(device)
 
-    optimizer = model.configure_optimizers(weight_decay=weight_decay, learning_rate=2.5e-4, betas=(0.9, 0.95), device=device)
+    optimizer = model.configure_optimizers(weight_decay=weight_decay, learning_rate=2.5e-4, betas=(0.9, 0.95),
+                                           device_type=device)
 
     scaler = torch.cuda.amp.GradScaler(enabled=(dtype == 'float16'))
 
@@ -109,14 +96,14 @@ if __name__ == '__main__':
     save_intervals_idx = 0
     total_loss = 0
     total_accuracy = 0
-    
+
     for epoch in range(num_epochs):
         t1 = time.time()
         for batch_idx, data in enumerate(dataloader):
             optimizer.zero_grad()
 
-            x = data['input_ids'][...,:-1].contiguous().to(device)
-            y = data['input_ids'][...,1:].contiguous().to(device)
+            x = data['input_ids'][..., :-1].contiguous().to(device)
+            y = data['input_ids'][..., 1:].contiguous().to(device)
             if mixed:
                 with torch.amp.autocast(device_type='cuda', dtype=torch.float16):
                     logits, loss = model(x, y)
@@ -136,7 +123,8 @@ if __name__ == '__main__':
 
             if batch_idx % 10 == 0 and batch_idx > 0:
                 t2 = time.time()
-                print(f'Batch: {batch_idx}, Loss: {total_loss / (batch_idx + 1):.3f}, Accuracy: {total_accuracy/ (batch_idx + 1):.4f}')
+                print(
+                    f'Batch: {batch_idx}, Loss: {total_loss / (batch_idx + 1):.3f}, Accuracy: {total_accuracy / (batch_idx + 1):.4f}')
                 print(f"Time taken for 10 batches: {t2 - t1:.2f} sec\n")
                 logging.info(
                     f'Batch: {batch_idx}, Loss: {loss}, Accuracy: {accuracy}'
@@ -157,4 +145,3 @@ if __name__ == '__main__':
                 print(f"Training progress: {save_intervals_idx + 1}0%, Average Loss so far: {avg_loss_so_far:.4f}")
 
                 save_intervals_idx += 1  # Move to the next save interval
-

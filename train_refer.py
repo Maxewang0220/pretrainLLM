@@ -20,6 +20,7 @@ def accuracy(logits, targets):
 
 if __name__ == '__main__':
     no_mixed = False
+    batch_size = 16
     vocab_size = 50257
     max_length = 512
     num_layers = 12
@@ -43,9 +44,11 @@ if __name__ == '__main__':
     print(device)
 
     dataset = load_from_disk("./bookcorpus_split_2")
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True, num_workers=4)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     total_batches = len(dataloader)
+    print("total batches num: ", total_batches)
+    logging.info("total batches num: ", total_batches)
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
 
@@ -118,8 +121,8 @@ if __name__ == '__main__':
             scheduler.step()  # 更新学习率    
 
             total_loss += loss.item()
-            accuracy = accuracy(logits, y)
-            total_accuracy += accuracy
+            current_accuracy = accuracy(logits, y)
+            total_accuracy += current_accuracy
 
             if batch_idx % 10 == 0 and batch_idx > 0:
                 t2 = time.time()
@@ -127,7 +130,7 @@ if __name__ == '__main__':
                     f'Batch: {batch_idx}, Loss: {total_loss / (batch_idx + 1):.3f}, Accuracy: {total_accuracy / (batch_idx + 1):.4f}')
                 print(f"Time taken for 10 batches: {t2 - t1:.2f} sec\n")
                 logging.info(
-                    f'Batch: {batch_idx}, Loss: {loss}, Accuracy: {accuracy}'
+                    f'Batch: {batch_idx}, Loss: {loss}, Accuracy: {current_accuracy}'
                     f'Time taken for 10 batches: {t2 - t1:.2f} sec\n')
                 t1 = time.time()
 

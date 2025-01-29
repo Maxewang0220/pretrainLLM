@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     total_batches = len(dataloader)
     print("total batches num: ", total_batches)
-    logging.info("total batches num: ", total_batches)
+    logging.info(f"total batches num: {total_batches}")
     # 每完成10%保存一次
     save_intervals = [int(total_batches * (i / 10)) for i in range(1, 11)]  # 保存点：[10%, 20%, ..., 100%]
 

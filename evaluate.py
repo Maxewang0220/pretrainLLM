@@ -13,13 +13,13 @@ if __name__ == "__main__":
     num_heads = 12
     forward_expansion = 4
     dropout = 0.1
-    max_length = 256
+    max_length = 512
     device = 'cuda'
 
     # instantiate the model
-    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
+    model = MyGPT(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
 
-    model.load_state_dict(torch.load('model2_256_100_percent.pth'))
+    model.load_state_dict(torch.load('model2_512_20_percent.pth'))
 
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
 
@@ -32,6 +32,7 @@ if __name__ == "__main__":
         print("Generated text: ")
 
         # inference
-        generated_sequence = predict_with_sampling(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
-                                                   eos_token_id=tokenizer.eos_token_id,
-                                                   device=device)
+        generated_sequence = predict(model, input_sequence=input_text, tokenizer=tokenizer,
+                                     max_length=200,
+                                     eos_token_id=tokenizer.eos_token_id,
+                                     device=device)

@@ -36,9 +36,6 @@ if __name__ == '__main__':
         dataset = load_dataset_bookcorpus("bookcorpus/bookcorpus", split="train", tokenizer=tokenizer,
                                           max_length=max_length)
 
-    print("finish")
-    exit()
-
     dataset = dataset.shuffle(seed=32)
 
     valid_dataset = dataset.select(range(1))

@@ -119,7 +119,7 @@ class GPT2Block(nn.Module):
         # 1) Pre-LN, Self-Attention
         x = self.ln_1(x)  # GPT-2 style: apply LN before attention
         # batch_first=True，所以不需要转置
-        attn_out, _ = self.attn(x, x, x, attn_mask=mask, is_causal=True)
+        attn_out, _ = self.attn(x, x, x, attn_mask=mask)
         x = x + self.drop(attn_out)  # 残差连接
 
         # 2) Pre-LN, Feed Forward
@@ -154,7 +154,7 @@ class MyGPT(nn.Module):
         self.drop = nn.Dropout(dropout)
 
         self.apply(self._init_weights)
-    
+
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
@@ -188,10 +188,11 @@ class MyGPT(nn.Module):
         # 通过lm_head
         logits = self.lm_head(hidden_states)  # (batch_size, seq_len, vocab_size)
         return logits
-    
+
     def generate_square_subsequent_mask(self, size):
         mask = torch.nn.Transformer.generate_square_subsequent_mask(size)
         return mask
+
 
 def train(model, dataset, valid_dataset, num_epochs=3, batch_size=32, learning_rate=1.5e-4, device='cuda',
           max_length=128, warmup_ratio=0.03):
@@ -365,7 +366,7 @@ def predict(model, input_sequence, tokenizer, max_length=50, eos_token_id=None, 
     with torch.no_grad():
         for _ in range(max_length):
             # Forward pass
-            outputs = model(generated_sequence)
+            outputs = model(generated_sequence, mask=None)
 
             # Get the predicted next token (take the last token in the sequence)
             next_token_logits = outputs[:, -1, :]

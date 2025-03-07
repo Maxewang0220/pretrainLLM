@@ -10,12 +10,19 @@ import time
 
 
 @torch.no_grad()
-def accuracy(logits, targets):
-    prediction = F.softmax(logits, dim=2)
-    prediction = torch.argmax(prediction, dim=2)
-    compare = torch.eq(prediction, targets).float()
-    accuracy = torch.mean(compare).item()
-    return accuracy
+def accuracy(logits, targets, pad_token_id=0):
+    prediction = torch.argmax(F.softmax(logits, dim=2), dim=2)
+
+    # 生成 mask，忽略填充 token（mask 为 True 的地方会被计算）
+    mask = targets.ne(pad_token_id)  # 不等于 pad_token_id 的地方为 True
+
+    # 计算预测正确的情况
+    correct = (prediction == targets) & mask  # 仅在 mask 位置计算
+
+    # 计算准确率（忽略 padding）
+    accuracy = correct.float().sum() / mask.float().sum()
+
+    return accuracy.item()
 
 
 if __name__ == '__main__':
@@ -52,7 +59,8 @@ if __name__ == '__main__':
 
     print(device)
 
-    dataset = load_from_disk("./bookcorpus_split_2")
+    # dataset = load_from_disk("./bookcorpus_split_2")
+    dataset = load_from_disk("./alpaca_1024")
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     total_batches = len(dataloader)
@@ -78,6 +86,8 @@ if __name__ == '__main__':
         resid_pdrop=residual_dropout,
         dropout=feedforward_dropout,
         num_layer=num_layers)
+
+    model.load_state_dict(torch.load('./GPT_512_100_percent.pth'))
 
     model.to(device)
 
@@ -136,7 +146,7 @@ if __name__ == '__main__':
 
             # Check if we need to save the model at this batch
             if save_intervals_idx < len(save_intervals) and (batch_idx + 1) == save_intervals[save_intervals_idx]:
-                model_name = f'GPT_{max_length}_{save_intervals_idx + 1}0_percent.pth'
+                model_name = f'GPT_Alpaca_{max_length}_{save_intervals_idx + 1}0_percent.pth'
                 # SAVE PATH
                 save_path = f'./{model_name}'
                 torch.save(model.state_dict(), save_path)

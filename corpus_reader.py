@@ -73,7 +73,7 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=512, conc
 
 
 # Load the Alpaca dataset
-def load_dataset_Alpaca(dataset_name, split, tokenizer, max_length=1024):
+def load_dataset_Alpaca(dataset_name, split, tokenizer, max_length=512):
     # Step 1: Load dataset
     dataset = datasets.load_dataset(
         dataset_name,
@@ -119,7 +119,7 @@ def load_dataset_Alpaca(dataset_name, split, tokenizer, max_length=1024):
 
     # Step 4: 设置为 PyTorch 格式，并保存预处理后的数据
     tokenized_dataset.set_format(type="torch", columns=["input_ids"])
-    tokenized_dataset.save_to_disk("./alpaca_1024")
+    tokenized_dataset.save_to_disk("./alpaca_512")
 
     return tokenized_dataset
 

@@ -4,6 +4,7 @@ from torch.nn import functional as F
 import math
 import inspect
 
+
 class MHA(nn.Module):
     def __init__(self, d_model, num_heads, attn_pdrop, resid_pdrop):
         super().__init__()
@@ -11,21 +12,24 @@ class MHA(nn.Module):
         self.num_heads = num_heads
         self.attn_pdrop = attn_pdrop
         self.resid_dropout = nn.Dropout(resid_pdrop)
-        self.ln = nn.Linear(d_model, d_model*3)
+        self.ln = nn.Linear(d_model, d_model * 3)
         self.c_proj = nn.Linear(d_model, d_model)
 
     def forward(self, x):
         B, T, C = x.size()
         x_qkv = self.ln(x)
         q, k, v = x_qkv.split(self.d_model, dim=2)
-        q = q.view(B, T, self.num_heads, C//self.num_heads).transpose(1, 2)
-        k = k.view(B, T, self.num_heads, C//self.num_heads).transpose(1, 2)
-        v = v.view(B, T, self.num_heads, C//self.num_heads).transpose(1, 2)
-        y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None, dropout_p=self.attn_pdrop if self.training else 0, is_causal=True)
+        q = q.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+        k = k.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+        v = v.view(B, T, self.num_heads, C // self.num_heads).transpose(1, 2)
+        y = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=None,
+                                                             dropout_p=self.attn_pdrop if self.training else 0,
+                                                             is_causal=True)
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         y = self.c_proj(y)
         y = self.resid_dropout(y)
         return y
+
 
 class FeedForward(nn.Module):
     def __init__(self, d_model, dff, dropout):
@@ -42,7 +46,8 @@ class FeedForward(nn.Module):
         x = self.ln2(x)
         x = self.dropout(x)
         return x
-    
+
+
 class Block(nn.Module):
     def __init__(self, d_model, num_heads, dff, attn_pdrop, resid_pdrop, dropout):
         super().__init__()
@@ -56,14 +61,17 @@ class Block(nn.Module):
         x = x + self.ff(self.layernorm2(x))
         return x
 
+
 class GPT2(nn.Module):
-    def __init__(self, vocab_size, d_model, block_size, embed_pdrop, num_heads, dff, attn_pdrop, resid_pdrop, dropout, num_layer):
+    def __init__(self, vocab_size, d_model, block_size, embed_pdrop, num_heads, dff, attn_pdrop, resid_pdrop, dropout,
+                 num_layer):
         super().__init__()
         self.token_embed = nn.Embedding(vocab_size, d_model, sparse=False)
         self.pos_embed = nn.Embedding(block_size, d_model, sparse=False)
         self.dropout_embed = nn.Dropout(embed_pdrop)
-        #self.blocks = [Block(d_model, num_heads, dff, attn_pdrop, resid_pdrop, dropout) for _ in range(num_layer)]
-        self.blocks = nn.ModuleList([Block(d_model, num_heads, dff, attn_pdrop, resid_pdrop, dropout) for _ in range(num_layer)])
+        # self.blocks = [Block(d_model, num_heads, dff, attn_pdrop, resid_pdrop, dropout) for _ in range(num_layer)]
+        self.blocks = nn.ModuleList(
+            [Block(d_model, num_heads, dff, attn_pdrop, resid_pdrop, dropout) for _ in range(num_layer)])
         self.num_layer = num_layer
         self.block_size = block_size
         self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
@@ -75,7 +83,7 @@ class GPT2(nn.Module):
         # apply special scaled init to the residual projections, per GPT-2 paper
         for pn, p in self.named_parameters():
             if pn.endswith('c_proj.weight'):
-                torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * num_layer))
+                torch.nn.init.normal_(p, mean=0.0, std=0.02 / math.sqrt(2 * num_layer))
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
@@ -88,7 +96,7 @@ class GPT2(nn.Module):
     def forward(self, x, targets=None):
         device = x.device
         b, t = x.size()
-        pos = torch.arange(0, t, dtype=torch.long, device=device) 
+        pos = torch.arange(0, t, dtype=torch.long, device=device)
         x = self.token_embed(x) + self.pos_embed(pos)
         x = self.dropout_embed(x)
         for block in self.blocks:
@@ -97,7 +105,7 @@ class GPT2(nn.Module):
 
         if targets is not None:
             logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=50256)
         else:
             logits = self.lm_head(x[:, -1, :])
             loss = None
@@ -129,9 +137,9 @@ class GPT2(nn.Module):
         print(f"using fused AdamW: {use_fused}")
 
         return optimizer
-    
+
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None, block_size=512):
+    def generate(self, idx, max_new_tokens, determined=True, temperature=1.0, top_k=None, block_size=512):
         for _ in range(max_new_tokens):
             # if the sequence context is growing too long we must crop it at block_size
             idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
@@ -146,7 +154,14 @@ class GPT2(nn.Module):
             # apply softmax to convert logits to (normalized) probabilities
             probs = F.softmax(logits, dim=-1)
             # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1)
+            if determined:
+                idx_next = torch.argmax(probs, dim=-1)
+                idx_next = idx_next.unsqueeze(1)
+            else:
+                idx_next = torch.multinomial(probs, num_samples=1)
+
+            if idx_next == 50256:
+                break
             # append sampled index to the running sequence and continue
             idx = torch.cat((idx, idx_next), dim=1)
 

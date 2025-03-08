@@ -25,7 +25,6 @@ if __name__ == '__main__':
         device = 'cpu'
 
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    vocab_size = 50257
 
     model = GPT2(
         vocab_size=vocab_size,
@@ -40,7 +39,7 @@ if __name__ == '__main__':
         num_layer=num_layers)
 
     model.to(device)
-    model.load_state_dict(torch.load("GPT_512_100_percent.pth"))
+    model.load_state_dict(torch.load("GPT_Alpaca_512_100_percent.pth"))
     model.eval()
 
     while True:

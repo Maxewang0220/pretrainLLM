@@ -10,7 +10,7 @@ import time
 
 
 @torch.no_grad()
-def accuracy(logits, targets, pad_token_id=0):
+def accuracy(logits, targets, pad_token_id=50256):
     prediction = torch.argmax(F.softmax(logits, dim=2), dim=2)
 
     # 生成 mask，忽略填充 token（mask 为 True 的地方会被计算）

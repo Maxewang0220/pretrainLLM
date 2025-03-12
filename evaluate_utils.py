@@ -1,5 +1,7 @@
 from model import MyGPT2, predict
+
 from Q_A import qa_data
+from model_refer import GPT2
 
 # 导入 Transformers 库的 GPT2 Tokenizer
 from transformers import GPT2Tokenizer
@@ -180,36 +182,74 @@ Reasoning: [Provide a detailed explanation]"""
             f.write(generated_text + "\n")
 
 
-if __name__ == "__main__":
-    # hyper parameters
+if __name__ == '__main__':
+    no_mixed = False
+    batch_size = 16
     vocab_size = 50257
-    # size of the embedding (original)
-    embedding_size = 768
-    # number of transformer blocks (original)
+    max_length = 512
     num_layers = 12
-    # number of attention heads (original)
     num_heads = 12
-    forward_expansion = 4
-    dropout = 0.1
-    max_length = 256
-    device = 'cuda'
+    embedding_size = 768
+    forward_expansion = 3072
+    embedding_dropout = 0.1
+    attention_dropout = 0.1
+    residual_dropout = 0.1
+    feedforward_dropout = 0.1
+    weight_decay = 0.01
+    warm_up = 0.03
+    generate_len = 128
 
-    # instantiate the model
-    model = MyGPT2(vocab_size, embedding_size, num_layers, num_heads, forward_expansion, dropout, max_length)
+    if torch.cuda.is_available():
+        device = 'cuda'
+    else:
+        device = 'cpu'
 
-    model.load_state_dict(torch.load('model_256_100_percent.pth'))
+    tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
+    model = GPT2(
+        vocab_size=vocab_size,
+        d_model=embedding_size,
+        block_size=max_length,
+        embed_pdrop=embedding_dropout,
+        num_heads=num_heads,
+        dff=forward_expansion,
+        attn_pdrop=attention_dropout,
+        resid_pdrop=residual_dropout,
+        dropout=feedforward_dropout,
+        num_layer=num_layers)
 
-    while True:
-        # input text
-        input_text = input("Context: ")
-        if input_text == 'exit':
-            break
+    model.to(device)
+    model.load_state_dict(torch.load("GPT_Alpaca_512_100_percent.pth"))
+    model.eval()  # ============================================
 
-        print("Generated text: ")
+    valid_dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer=tokenizer, max_length=max_length)
+    valid_dataset = valid_dataset.shuffle(seed=8)
+    valid_dataset = valid_dataset.select(range(10))
 
-        # inference
-        generated_sequence = predict(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
-                                     eos_token_id=tokenizer.eos_token_id,
-                                     device=device)
+    inputs = valid_dataset["input_ids"].to(device)
+    labels = valid_dataset["labels"].to(device)
+    loss = torch.nn.CrossEntropyLoss()
+
+    # calcullate deals with one, so to process with 10 needed here or in the function itself
+
+    # 1st calculate perplexity with cross entropy loss
+    mean_perplexity = calculate_perplexity(model, inputs, device)
+    print("mean perplexity", mean_perplexity)
+
+    get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
+
+    # # 3rd generate and write n sentences
+    generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
+
+    # while True:
+    #     # input text
+    #     input_text = input("Context: ")
+    #     if input_text == 'exit':
+    #         break
+    #
+    #     print("Generated text: ")
+    #
+    #     # inference
+    #     generated_sequence = predict(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
+    #                                  eos_token_id=tokenizer.eos_token_id,
+    #                                  device=device)

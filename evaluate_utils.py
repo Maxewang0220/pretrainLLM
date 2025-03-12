@@ -18,42 +18,37 @@ from datasets import load_dataset
 # 其他工具库
 import random
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 
-# perplexity; 1st part of the evaluation
+# gpt 给的# perplexity; 1st part of the evaluation
 def calculate_perplexity(model, inputs, device='cuda'):
     model.to(device)
     model.eval()
 
     input_ids = inputs.to(device)
 
-    # get logits
+    # 传入 targets，确保 logits 形状正确
     with torch.no_grad():
-        logits = model(input_ids)  # (batch_size, seq_len, vocab_size)
+        logits, _ = model(input_ids, targets=input_ids)  # 保证 logits 是 (batch_size, seq_len, vocab_size)
 
-    # softmax
+    # softmax 计算概率
     probs = F.softmax(logits, dim=-1)  # (batch_size, seq_len, vocab_size)
 
-    # get the probability of the target word
+    # 获取目标 token 概率
     target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # (batch_size, seq_len)
-    if torch.any(target_probs == 0):
-        print("Warning: target_probs contains 0 values")
 
-    # 避免 log(0) 的问题，可以考虑添加一个小的 epsilon
-    epsilon = 0
-    log_probs = torch.log(target_probs + epsilon)  # (batch_size, seq_len)
+    # 避免 log(0)
+    log_probs = torch.log(target_probs.clamp(min=1e-9))
 
-    print(f"log_probs: {log_probs}")
-
-    # 计算每个样本的平均 log 概率
-    average_log_prob = log_probs.mean(dim=-1)  # (batch_size)
+    # 计算平均 log 概率
+    mean_log_prob = log_probs.mean()
 
     # 计算 perplexity
-    perplexity = torch.exp(-average_log_prob)  # (batch_size)
-    print(f"Perplexity: {perplexity}")
+    perplexity = torch.exp(-mean_log_prob).item()
 
-    # 返回平均 perplexity
-    return perplexity.mean().item()
+    return perplexity
 
 
 def get_QA_token_prob(model, tokenizer, max_tokens=10, device='cuda', qa_data=qa_data):
@@ -219,27 +214,35 @@ if __name__ == '__main__':
         num_layer=num_layers)
 
     model.to(device)
-    model.load_state_dict(torch.load("GPT_Alpaca_512_100_percent.pth"))
+    model.load_state_dict(torch.load("GPT_512_50_2_percent.pth"))
     model.eval()  # ============================================
 
-    valid_dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer=tokenizer, max_length=max_length)
-    valid_dataset = valid_dataset.shuffle(seed=8)
-    valid_dataset = valid_dataset.select(range(10))
-
-    inputs = valid_dataset["input_ids"].to(device)
-    labels = valid_dataset["labels"].to(device)
-    loss = torch.nn.CrossEntropyLoss()
+    # valid_dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer=tokenizer, max_length=max_length)
+    # valid_dataset = valid_dataset.shuffle(seed=8)
+    # valid_dataset = valid_dataset.select(range(10))
+    #
+    # inputs = valid_dataset["input_ids"].to(device)
+    # labels = valid_dataset["labels"].to(device)
+    # loss = torch.nn.CrossEntropyLoss()
 
     # calcullate deals with one, so to process with 10 needed here or in the function itself
+    input_text = "The quick brown fox jumps over the lazy dog."
+    # tokenize and truncate to max_length tokens
+    encoded = tokenizer(input_text, truncation=True, max_length=200, return_tensors="pt")
+    # decode the tokenized input text
+    input_text = tokenizer.decode(encoded["input_ids"][0], skip_special_tokens=True)
+    print("input_text: ", input_text, '\n')
+    # string
+    print("Generated text: ")
 
     # 1st calculate perplexity with cross entropy loss
-    mean_perplexity = calculate_perplexity(model, inputs, device)
-    print("mean perplexity", mean_perplexity)
+    mean_perplexity = calculate_perplexity(model, inputs=encoded["input_ids"].to(device), device=device)
+    print("Perplexity: ", mean_perplexity)
 
-    get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
-
-    # # 3rd generate and write n sentences
-    generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
+    # get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
+    #
+    # # # 3rd generate and write n sentences
+    # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
 
     # while True:
     #     # input text

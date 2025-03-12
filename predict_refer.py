@@ -1,6 +1,4 @@
 from transformers import GPT2Tokenizer
-
-from evaluator import calculate_perplexity
 from model_refer import GPT2
 import torch
 
@@ -41,15 +39,14 @@ if __name__ == '__main__':
         num_layer=num_layers)
 
     model.to(device)
-    model.load_state_dict(torch.load("GPT_Alpaca_512_100_percent.pth"))
+    model.load_state_dict(torch.load("GPT_512_50_2_percent.pth"))
     model.eval()
-calculate_perplexity()
 
-while True:
-    input_sentence = input("Context: ")
+    while True:
+        input_sentence = input("Context: ")
 
-    token_id = tokenizer.encode(input_sentence)
-    input_data = torch.reshape(torch.tensor(token_id, device=device), [1, -1])
-    predicted = model.generate(input_data, generate_len, 1.0)
-    print("Generated text:\n-------------------")
-    print(tokenizer.decode(predicted.cpu().numpy()[0]))
+        token_id = tokenizer.encode(input_sentence)
+        input_data = torch.reshape(torch.tensor(token_id, device=device), [1, -1])
+        predicted = model.generate(input_data, generate_len, 1.0)
+        print("Generated text:\n-------------------")
+        print(tokenizer.decode(predicted.cpu().numpy()[0]))

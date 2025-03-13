@@ -1,5 +1,3 @@
-from model import MyGPT2, predict
-
 from Q_A import qa_data
 from model_refer import GPT2
 
@@ -14,12 +12,15 @@ from torch.utils.data import DataLoader
 from datasets import load_dataset
 import random
 import numpy as np
-import torch.nn.functional as F
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 from transformers import GPT2Tokenizer
 from tqdm import tqdm
 import json
+# 批量
+import torch
+import torch.nn.functional as F
+import numpy as np
 
 
 def calculate_perplexity(model, dataloader, device='cuda'):
@@ -58,175 +59,6 @@ def calculate_perplexity(model, dataloader, device='cuda'):
     return mean_perplexity
 
 
-# def get_QA_token_prob(model, tokenizer, max_tokens=10, device='cuda', qa_data=qa_data):
-#     model.to(device)
-#     model.eval()
-#
-#     # get a random question and answer pair
-#     random_qa = random.choice(qa_data)
-#     question = random_qa["question"]
-#     real_answer = random_qa["answer"]
-#     print("question is : ", question)
-#     print("real_answer is : ", real_answer)
-#
-#     answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(
-#         device)
-#     print("answer_tokens: ", answer_tokens[0])
-#     print("shape of answer_tokens: ", answer_tokens.shape)
-#
-#     # 假设 answer_tokens 是通过 tokenizer 得到的 input_ids
-#     answer_tokens_ids = answer_tokens[0].tolist()  # 转换为列表
-#     tokens = tokenizer.convert_ids_to_tokens(answer_tokens_ids)  # 转换为 token
-#     print("Tokens: ", tokens)
-#
-#     # Tokenize input sentence and move to device
-#     input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
-#     generated_sequence = input_sequence.clone()
-#
-#     token_distributions = []  # Store probability distributions for each generated token
-#
-#     with torch.no_grad():
-#         for _ in range(max_tokens):
-#             # Forward pass to get logits
-#             outputs = model(generated_sequence)
-#             logits = outputs[:, -1, :]  # Get the logits for the last token in the sequence
-#
-#             # Convert logits to probabilities
-#             probs = softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
-#
-#             # Store the probability distribution
-#             token_distributions.append(probs[0].cpu().numpy())
-#
-#             # Get the next token (argmax or sampling, here using argmax)
-#             next_token = torch.argmax(probs, dim=-1, keepdim=True)
-#
-#             # Append the predicted token to the sequence
-#             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
-#
-#     # convert to numpy array
-#     # convert to numpy array
-#     token_distributions_array = np.array(token_distributions)
-#     print(token_distributions_array.shape)  # 输出 (10, 50257)
-#
-#     # Convert answer_tokens to CPU and NumPy array
-#     answer_tokens = answer_tokens.cpu().numpy()  # 转为 NumPy 数组
-#     print("answer_tokens: ", answer_tokens)  # 输出 answer_tokens:  [464]
-#     print("len(answer_tokens): ", len(answer_tokens))  # 输出 len(answer_tokens):  1
-#
-#     # get the probability of the target token
-#     selected_probs = token_distributions_array[:, answer_tokens]  # Shape: (max_tokens, len(answer_tokens))
-#     print("Selected probabilities:\n", selected_probs)
-#     print("Shape: ", selected_probs.shape)
-#
-#     return token_distributions
-
-
-# model.to(device)
-# https://huggingface.co/thanhnew2001/everything
-
-# 3nd part of the evaluation
-
-
-# gpt 给的
-
-import random
-import numpy as np
-import torch
-import torch.nn.functional as F
-
-#
-# def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
-#     """
-#     计算真实答案 `real_answer` 中 token 在模型生成 token 分布中的概率。
-#
-#     参数：
-#     - model: 语言模型 (GPT2)
-#     - tokenizer: 与模型匹配的 tokenizer
-#     - qa_data: 问答数据集 (包含 question 和 answer)
-#     - max_tokens: 最大生成 token 数
-#     - device: 运行设备 ('cuda' 或 'cpu')
-#
-#     返回：
-#     - token_distributions: 存储每一步 token 概率分布的列表
-#     """
-#     model.to(device)
-#     model.eval()
-#
-#     # 1️⃣  随机选择一个 Q&A
-#     random_qa = random.choice(qa_data)
-#     question = random_qa["question"]
-#     real_answer = random_qa["answer"]
-#
-#     print(f"Question: {question}")
-#     print(f"Real Answer: {real_answer}")
-#
-#     # 2️⃣ Tokenize real answer
-#     answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(device)
-#     answer_token_ids = answer_tokens[0].tolist()
-#
-#     tokens = tokenizer.convert_ids_to_tokens(answer_token_ids)
-#     print(f"Tokens: {tokens}")
-#
-#     # 3️⃣ Tokenize question
-#     input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
-#     generated_sequence = input_sequence.clone()
-#
-#     token_distributions = []  # 存储每个生成 token 的概率分布
-#
-#     with torch.no_grad():
-#         for _ in range(max_tokens):
-#             # 获取模型 logits
-#             logits, _ = model(generated_sequence)  # 获取 logits
-#
-#             # 🚨 关键修正：检查 logits 形状
-#             print(f"Logits shape: {logits.shape}")  # 调试信息
-#
-#             if logits.dim() == 3:
-#                 logits = logits[:, -1, :]  # 取最后一个 token 的 logits
-#             elif logits.dim() == 2:
-#                 logits = logits  # 直接使用
-#             else:
-#                 raise ValueError(f"Unexpected logits shape: {logits.shape}")
-#
-#             # 计算 softmax 概率
-#             probs = F.softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
-#
-#             # 存储概率分布
-#             token_distributions.append(probs[0].cpu().numpy())
-#
-#             # 选择下一个 token（随机采样）
-#             next_token = torch.multinomial(probs, num_samples=1)
-#
-#             # 将预测的 token 添加到序列
-#             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
-#
-#     # 4️⃣ 计算真实答案的 token 在生成概率中的位置
-#     token_distributions_array = np.array(token_distributions)  # (max_tokens, vocab_size)
-#
-#     print(f"Token Distributions Shape: {token_distributions_array.shape}")  # (max_tokens, vocab_size)
-#
-#     # 5️⃣ 获取真实答案 token 的概率
-#     answer_tokens_cpu = answer_tokens.cpu().numpy().flatten()
-#     min_len = min(len(token_distributions), len(answer_tokens_cpu))
-#
-#     selected_probs = token_distributions_array[np.arange(min_len), answer_tokens_cpu[:min_len]]
-#
-#     print(f"Selected Probabilities:\n {selected_probs}")
-#     # ============
-#     print(f"Selected tokens: {answer_tokens_cpu[:min_len]}")
-#     print(f"Selected tokens back to words: {[tokenizer.decode([idx]) for idx in answer_tokens_cpu[:min_len]]}")
-#
-#     print(f"Shape of Selected Probabilities: {selected_probs.shape}")
-#
-#     return token_distributions
-
-
-# 批量
-import torch
-import torch.nn.functional as F
-import numpy as np
-
-
 def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     """
     计算整个问答数据集的平均概率
@@ -237,7 +69,9 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     qa_avg_probs = []  # 存储每个 Q&A 的平均概率
 
     for idx, qa_pair in enumerate(qa_data):
-        question = qa_pair["question"]
+        # question = qa_pair["question"] + " "
+        question = qa_pair["question"].strip() + " "  # ✅ 确保只有一个空格
+
         real_answer = qa_pair["answer"]
 
         print(f"\nProcessing Q&A {idx + 1}/{len(qa_data)}")
@@ -272,7 +106,7 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
 
             # 将当前 token 追加到输入序列，以预测下一个 token
             input_sequence = torch.cat((input_sequence, torch.tensor([[token_id]], device=device)), dim=1)
-
+            print(f"Updated input sequence: {tokenizer.decode(input_sequence[0])}")
         # 4️⃣ 计算当前 Q&A 的平均 token 概率
         qa_avg_prob = np.mean(selected_probs) if selected_probs else 0
         print(f"Average probability for this Q&A: {qa_avg_prob:.9f}")
@@ -286,63 +120,39 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     return dataset_avg_prob
 
 
-def generate_write_n_sentences(model, tokenizer, device='cuda', num_sentence=10):
-    model.to(device)
+def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_new_tokens=200, temperature=0.8,
+                               top_k=40):
     model.eval()
+    generated_sentences = []
 
-    rate_prompt = """You are a language expert tasked with evaluating a set of generated sentences. Please rate each sentence based on the following criteria:
-Grammar and Syntax (1-10): Does the sentence follow proper grammar and syntax rules?
-Semantic Clarity (1-10): Is the meaning of the sentence clear and easy to understand?
-Contextual Relevance (1-10): Is the sentence relevant to the given topic or theme?
-Creativity and Style (1-10): Does the sentence demonstrate creativity or an appropriate style?
-For each sentence, provide a detailed score (1-10) for each category, along with a brief explanation for your ratings.
+    for i in range(num_sentence):
+        # 确保使用适当的起始 token
+        start_token = torch.tensor([[tokenizer.bos_token_id]], dtype=torch.long).to(device)
 
-Here are the sentences to evaluate:
+        # 生成文本
+        with torch.no_grad():
+            generated_tokens = model.generate(
+                idx=start_token,
+                max_new_tokens=max_new_tokens,
+                determined=False,
+                temperature=temperature,
+                top_k=top_k
+            )
 
-[Sentence 1]
-[Sentence 2]
-[Sentence 3]
-Please respond in the following format:
+        # 解码文本
+        generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True).strip()
 
-Sentence 1:
+        # 确保句子不会有无意义的前缀
+        generated_text = generated_text.lstrip(",.:;!?")  # 删除前导符号
+        generated_sentences.append(f"\nThis is sentence {i + 1}:")  # 添加句子编号
+        generated_sentences.append(generated_text)
 
-Grammar and Syntax: X/10
-Semantic Clarity: X/10
-Contextual Relevance: X/10
-Creativity and Style: X/10
-Reasoning: [Provide a detailed explanation]"""
+    # 写入文件
+    with open("generated_sentences.txt", "w", encoding="utf-8") as f:
+        for sentence in generated_sentences:
+            f.write(sentence + "\n")
 
-    # load the CNN/DailyMail dataset as prompt
-    cnn_dataset = load_dataset("ccdv/cnn_dailymail", "3.0.0", split="train", trust_remote_code=True)
-
-    # write to a file
-    with open("generated_sentences.txt", "w") as f:
-        f.write(rate_prompt)
-        f.write("Generated sentences:\n")
-        for i in range(num_sentence):
-            sentence_idx = "This is sentence " + str(i) + ":\n"
-            # original text
-            input_text = cnn_dataset[i]["article"]
-            print("Context: ", input_text, '\n')
-            # tokenize and truncate to max_length tokens
-            # max_length=200, generate a lot ( and .
-            # encoded = tokenizer(input_text, truncation=True, max_length=200, return_tensors="pt")
-            encoded = tokenizer(input_text, truncation=True, max_length=20, return_tensors="pt")
-
-            # decode the tokenized input text
-            input_text = tokenizer.decode(encoded["input_ids"][0], skip_special_tokens=True)
-            print("input_text: ", input_text, '\n')
-
-            # string
-            print("Generated text: ")
-            generated_text = predict(model, input_text, tokenizer, max_length=50, eos_token_id=tokenizer.eos_token_id,
-                                     device='cuda')
-            print("\n")
-            # char lists to string sentence
-            generated_text = ''.join(generated_text).strip()
-
-            f.write(sentence_idx)
-            f.write(generated_text + "\n")
+    print(f"Generated {num_sentence} sentences and saved to 'generated_sentences.txt'.")
 
 
 if __name__ == '__main__':
@@ -388,7 +198,7 @@ if __name__ == '__main__':
     # 1->perplexity
     # 2->QA token prob
     # 3->generate and write n sentences
-    evaluate_mode = 2
+    evaluate_mode = 3
 
     # perplexity evaluation
     if evaluate_mode == 1:
@@ -427,6 +237,7 @@ if __name__ == '__main__':
         get_QA_dataset_avg_prob(model, tokenizer, device=device, qa_data=qa_data)
     # generate and write n sentences
     elif evaluate_mode == 3:
+        # 生成 10 句话并保存到文件
         generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
     else:
         print("Invalid evaluation mode. Please choose 1, 2, or 3.")

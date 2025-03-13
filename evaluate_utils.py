@@ -11,15 +11,8 @@ from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 import random
-import numpy as np
-from datasets import load_dataset
-from torch.utils.data import DataLoader
-from transformers import GPT2Tokenizer
 from tqdm import tqdm
 import json
-# 批量
-import torch
-import torch.nn.functional as F
 import numpy as np
 
 

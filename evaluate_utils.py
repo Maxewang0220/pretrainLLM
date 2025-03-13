@@ -27,11 +27,11 @@ def calculate_perplexity(model, dataloader, device='cuda'):
     total_tokens = 0
 
     with torch.no_grad():
-        # tqdm 进度条，显示 DataLoader 进度
+        # tqdm
         for batch in tqdm(dataloader, desc="Processing Batches", unit="batch"):
             input_ids = batch["input_ids"].to(device)  # (batch_size, seq_len)
 
-            # 获取 logits
+            # logits
             logits, _ = model(input_ids, targets=input_ids)  # (batch_size, seq_len, vocab_size)
 
             # 计算交叉熵损失

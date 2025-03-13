@@ -213,42 +213,32 @@ if __name__ == '__main__':
 
     # perplexity evaluation
     if evaluate_mode == 1:
-        tokenizer.pad_token = tokenizer.eos_token  # 解决 padding 问题
-        # 2️⃣ 加载数据集
+        tokenizer.pad_token = tokenizer.eos_token
         dataset = load_dataset("stas/openwebtext-10k", split="train")
 
 
-        # 3️⃣ Tokenization 处理
         def tokenize_function(examples):
             return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
 
         tokenized_dataset = dataset.map(tokenize_function, batched=True)
-
-        # 4️⃣ 转换格式
         tokenized_dataset.set_format(type="torch", columns=["input_ids"])
 
-        # 创建 DataLoader
         dataloader = DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=False)
 
-        # 计算数据集的平均 Perplexity
+        # calculate the mean perplexity of the dataset
         mean_ppl = calculate_perplexity(model, dataloader, device=device)
         print(f"Dataset Perplexity: {mean_ppl}")
 
     # QA token prob
     elif evaluate_mode == 2:
-
-        # 读取 JSON 文件
         with open("qa_dataset.json", "r", encoding="utf-8") as file:
             qa_data = json.load(file)
-
-        # 打印数据集内容
-        print(json.dumps(qa_data, indent=4))
 
         get_QA_dataset_avg_prob(model, tokenizer, device=device, qa_data=qa_data)
     # generate and write n sentences
     elif evaluate_mode == 3:
-        # 生成 10 句话并保存到文件
+        # generate 10 sentences and write them to a file
         generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
     else:
         print("Invalid evaluation mode. Please choose 1, 2, or 3.")

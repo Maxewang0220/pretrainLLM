@@ -96,7 +96,7 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
 
         qa_avg_probs.append(qa_avg_prob)
 
-    # 5️⃣ 计算所有 Q&A 的平均概率的平均值
+    # avearge probability of the dataset
     dataset_avg_prob = np.mean(qa_avg_probs) if qa_avg_probs else 0
     print(f"\nFinal Dataset Average Probability: {dataset_avg_prob:.9f}")
 
@@ -148,7 +148,7 @@ def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_ne
         generated_sentences.append(f"\nThis is sentence {i + 1}:")  # number the sentences
         generated_sentences.append(generated_text)
 
-    # 写入文件
+    # write
     with open("generated_sentences.txt", "w", encoding="utf-8") as f:
         for sentence in generated_sentences:
             f.write(sentence + "\n\n")
@@ -161,8 +161,8 @@ if __name__ == '__main__':
     batch_size = 16
     vocab_size = 50257
     max_length = 512
-    num_layers = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent 6; 12 for others
-    num_heads = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent 6; 12 for others
+    num_layers = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent; 12 for others
+    num_heads = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent; 12 for others
     embedding_size = 768
     forward_expansion = 3072
     embedding_dropout = 0.1
@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
     model.to(device)
     model.load_state_dict(torch.load("GPT_Base_512_50_percent.pth"))
-    model.eval()  # ============================================
+    model.eval()
 
     # 1->perplexity
     # 2->QA token prob

@@ -116,7 +116,25 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
 def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_new_tokens=200, temperature=0.8,
                                top_k=40):
     model.eval()
+
+    rating_prompt = """You are a language expert tasked with evaluating a set of generated sentences. Please rate each sentence based on the following criteria:
+    Grammar and Syntax (1-10): Does the sentence follow proper grammar and syntax rules?
+    Semantic Clarity (1-10): Is the meaning of the sentence clear and easy to understand?
+    Contextual Relevance (1-10): Is the sentence relevant to each other?
+    Creativity and Style (1-10): Does the sentence demonstrate creativity or an appropriate style?
+    For each sentence, provide a detailed score (1-10) for each category.
+
+    Please respond in the following format:
+
+    Sentence 1:
+
+    Grammar and Syntax: X/10
+    Semantic Clarity: X/10
+    Contextual Relevance: X/10
+    Creativity and Style: X/10 """
+
     generated_sentences = []
+    generated_sentences.append(rating_prompt + "\n")  # 添加提示语
 
     for i in range(num_sentence):
         # 确保使用适当的起始 token
@@ -143,7 +161,7 @@ def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_ne
     # 写入文件
     with open("generated_sentences.txt", "w", encoding="utf-8") as f:
         for sentence in generated_sentences:
-            f.write(sentence + "\n")
+            f.write(sentence + "\n\n")
 
     print(f"Generated {num_sentence} sentences and saved to 'generated_sentences.txt'.")
 
@@ -153,8 +171,8 @@ if __name__ == '__main__':
     batch_size = 16
     vocab_size = 50257
     max_length = 512
-    num_layers = 12
-    num_heads = 12
+    num_layers = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent 6; 12 for others
+    num_heads = 6  # 6 for GPT_Base_512_50_percent & GPT_Base_512_50_percent 6; 12 for others
     embedding_size = 768
     forward_expansion = 3072
     embedding_dropout = 0.1
@@ -185,13 +203,13 @@ if __name__ == '__main__':
         num_layer=num_layers)
 
     model.to(device)
-    model.load_state_dict(torch.load("GPT_Alpaca_512_100_percent.pth"))
+    model.load_state_dict(torch.load("GPT_Base_512_50_percent.pth"))
     model.eval()  # ============================================
 
     # 1->perplexity
     # 2->QA token prob
     # 3->generate and write n sentences
-    evaluate_mode = 3
+    evaluate_mode = 2
 
     # perplexity evaluation
     if evaluate_mode == 1:

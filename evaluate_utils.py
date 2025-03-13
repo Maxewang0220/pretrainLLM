@@ -129,6 +129,12 @@ def calculate_perplexity(model, dataloader, device='cuda'):
 
 # gpt 给的
 
+import random
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+
 def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
     """
     计算真实答案 `real_answer` 中 token 在模型生成 token 分布中的概率。
@@ -170,10 +176,17 @@ def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
     with torch.no_grad():
         for _ in range(max_tokens):
             # 获取模型 logits
-            logits, _ = model(generated_sequence)  # 你的 GPT2 forward 返回 logits, loss
+            logits, _ = model(generated_sequence)  # 获取 logits
 
-            # 取最后一个 token 的 logits
-            logits = logits[:, -1, :]
+            # 🚨 关键修正：检查 logits 形状
+            print(f"Logits shape: {logits.shape}")  # 调试信息
+
+            if logits.dim() == 3:
+                logits = logits[:, -1, :]  # 取最后一个 token 的 logits
+            elif logits.dim() == 2:
+                logits = logits  # 直接使用
+            else:
+                raise ValueError(f"Unexpected logits shape: {logits.shape}")
 
             # 计算 softmax 概率
             probs = F.softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
@@ -181,7 +194,7 @@ def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
             # 存储概率分布
             token_distributions.append(probs[0].cpu().numpy())
 
-            # 选择下一个 token（改为随机采样）
+            # 选择下一个 token（随机采样）
             next_token = torch.multinomial(probs, num_samples=1)
 
             # 将预测的 token 添加到序列
@@ -342,7 +355,7 @@ if __name__ == '__main__':
         # 打印数据集内容
         print(json.dumps(qa_data, indent=4))
 
-        get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
+        get_QA_token_prob(model, tokenizer, max_tokens=10, device=device, qa_data=qa_data)
     # generate and write n sentences
     elif evaluate_mode == 3:
         generate_write_n_sentences(model, tokenizer, device, num_sentence=10)

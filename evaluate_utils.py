@@ -128,12 +128,13 @@ def calculate_perplexity(model, dataloader, device='cuda'):
 
 
 # gpt 给的
+
 def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
     """
     计算真实答案 `real_answer` 中 token 在模型生成 token 分布中的概率。
 
     参数：
-    - model: 语言模型
+    - model: 语言模型 (GPT2)
     - tokenizer: 与模型匹配的 tokenizer
     - qa_data: 问答数据集 (包含 question 和 answer)
     - max_tokens: 最大生成 token 数
@@ -153,17 +154,14 @@ def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
     print(f"Question: {question}")
     print(f"Real Answer: {real_answer}")
 
-    # 2️⃣  Tokenize real answer
+    # 2️⃣ Tokenize real answer
     answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(device)
-    print(f"Answer Tokens: {answer_tokens[0].tolist()}")
-    print(f"Shape of Answer Tokens: {answer_tokens.shape}")
-
-    # 获取 answer tokens ID 和对应的 tokens
     answer_token_ids = answer_tokens[0].tolist()
+
     tokens = tokenizer.convert_ids_to_tokens(answer_token_ids)
     print(f"Tokens: {tokens}")
 
-    # 3️⃣  Tokenize question
+    # 3️⃣ Tokenize question
     input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
     generated_sequence = input_sequence.clone()
 
@@ -172,8 +170,10 @@ def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
     with torch.no_grad():
         for _ in range(max_tokens):
             # 获取模型 logits
-            outputs, _ = model(generated_sequence)  # 确保 forward 输出符合你的 GPT2 结构
-            logits = outputs[:, -1, :]  # 取最后一个 token 的 logits
+            logits, _ = model(generated_sequence)  # 你的 GPT2 forward 返回 logits, loss
+
+            # 取最后一个 token 的 logits
+            logits = logits[:, -1, :]
 
             # 计算 softmax 概率
             probs = F.softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
@@ -181,25 +181,22 @@ def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
             # 存储概率分布
             token_distributions.append(probs[0].cpu().numpy())
 
-            # 选择下一个 token（argmax 或随机采样）
-            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+            # 选择下一个 token（改为随机采样）
+            next_token = torch.multinomial(probs, num_samples=1)
 
             # 将预测的 token 添加到序列
             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
 
-    # 4️⃣  计算真实答案的 token 在生成概率中的位置
+    # 4️⃣ 计算真实答案的 token 在生成概率中的位置
     token_distributions_array = np.array(token_distributions)  # (max_tokens, vocab_size)
 
     print(f"Token Distributions Shape: {token_distributions_array.shape}")  # (max_tokens, vocab_size)
 
-    # 5️⃣  获取真实答案 token 的概率
-    answer_tokens_cpu = answer_tokens.cpu().numpy().flatten()  # 转为 NumPy 数组 (1D)
-    print(f"Answer Tokens: {answer_tokens_cpu}")
-    print(f"Length of Answer Tokens: {len(answer_tokens_cpu)}")
+    # 5️⃣ 获取真实答案 token 的概率
+    answer_tokens_cpu = answer_tokens.cpu().numpy().flatten()
+    min_len = min(len(token_distributions), len(answer_tokens_cpu))
 
-    # 这里的索引必须修正，避免 NumPy 多维索引错误
-    selected_probs = token_distributions_array[
-        np.arange(min(len(token_distributions), len(answer_tokens_cpu))), answer_tokens_cpu]
+    selected_probs = token_distributions_array[np.arange(min_len), answer_tokens_cpu[:min_len]]
 
     print(f"Selected Probabilities:\n {selected_probs}")
     print(f"Shape of Selected Probabilities: {selected_probs.shape}")
@@ -309,7 +306,7 @@ if __name__ == '__main__':
     # 1->perplexity
     # 2->QA token prob
     # 3->generate and write n sentences
-    evaluate_mode = 1
+    evaluate_mode = 2
 
     # perplexity evaluation
     if evaluate_mode == 1:

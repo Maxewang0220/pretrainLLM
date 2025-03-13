@@ -11,113 +11,202 @@ import torch
 import torch.nn.functional as F
 from torch.nn.functional import softmax
 from torch.utils.data import DataLoader
-
-# 导入 Hugging Face Datasets 库
 from datasets import load_dataset
-
-# 其他工具库
 import random
 import numpy as np
-import torch
 import torch.nn.functional as F
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+from transformers import GPT2Tokenizer
+from tqdm import tqdm
+import json
 
 
-# gpt 给的# perplexity; 1st part of the evaluation
-def calculate_perplexity(model, inputs, device='cuda'):
+def calculate_perplexity(model, dataloader, device='cuda'):
+    """
+    计算整个数据集的平均 perplexity (PPL) 并显示进度条
+    """
     model.to(device)
     model.eval()
 
-    input_ids = inputs.to(device)
-
-    # 传入 targets，确保 logits 形状正确
-    with torch.no_grad():
-        logits, _ = model(input_ids, targets=input_ids)  # 保证 logits 是 (batch_size, seq_len, vocab_size)
-
-    # softmax 计算概率
-    probs = F.softmax(logits, dim=-1)  # (batch_size, seq_len, vocab_size)
-
-    # 获取目标 token 概率
-    target_probs = probs.gather(dim=-1, index=input_ids.unsqueeze(-1)).squeeze(-1)  # (batch_size, seq_len)
-
-    # 避免 log(0)
-    log_probs = torch.log(target_probs.clamp(min=1e-9))
-
-    # 计算平均 log 概率
-    mean_log_prob = log_probs.mean()
-
-    # 计算 perplexity
-    perplexity = torch.exp(-mean_log_prob).item()
-
-    return perplexity
-
-
-def get_QA_token_prob(model, tokenizer, max_tokens=10, device='cuda', qa_data=qa_data):
-    model.to(device)
-    model.eval()
-
-    # get a random question and answer pair
-    random_qa = random.choice(qa_data)
-    question = random_qa["question"]
-    real_answer = random_qa["answer"]
-    print("question is : ", question)
-    print("real_answer is : ", real_answer)
-
-    answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(
-        device)
-    print("answer_tokens: ", answer_tokens[0])
-    print("shape of answer_tokens: ", answer_tokens.shape)
-
-    # 假设 answer_tokens 是通过 tokenizer 得到的 input_ids
-    answer_tokens_ids = answer_tokens[0].tolist()  # 转换为列表
-    tokens = tokenizer.convert_ids_to_tokens(answer_tokens_ids)  # 转换为 token
-    print("Tokens: ", tokens)
-
-    # Tokenize input sentence and move to device
-    input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
-    generated_sequence = input_sequence.clone()
-
-    token_distributions = []  # Store probability distributions for each generated token
+    total_loss = 0.0
+    total_tokens = 0
 
     with torch.no_grad():
-        for _ in range(max_tokens):
-            # Forward pass to get logits
-            outputs = model(generated_sequence)
-            logits = outputs[:, -1, :]  # Get the logits for the last token in the sequence
+        # tqdm 进度条，显示 DataLoader 进度
+        for batch in tqdm(dataloader, desc="Processing Batches", unit="batch"):
+            input_ids = batch["input_ids"].to(device)  # (batch_size, seq_len)
 
-            # Convert logits to probabilities
-            probs = softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
+            # 获取 logits
+            logits, _ = model(input_ids, targets=input_ids)  # (batch_size, seq_len, vocab_size)
 
-            # Store the probability distribution
-            token_distributions.append(probs[0].cpu().numpy())
+            # 计算交叉熵损失
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)),  # (batch_size * seq_len, vocab_size)
+                input_ids.view(-1),  # (batch_size * seq_len)
+                ignore_index=50256,  # 忽略 GPT-2 的 <|endoftext|>
+                reduction='sum'  # 计算总损失
+            )
 
-            # Get the next token (argmax or sampling, here using argmax)
-            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+            total_loss += loss.item()  # 累加损失
+            total_tokens += input_ids.numel()  # 计算总 token 数
 
-            # Append the predicted token to the sequence
-            generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+    # 计算平均 loss
+    avg_loss = total_loss / total_tokens
+    mean_perplexity = torch.exp(torch.tensor(avg_loss)).item()
 
-    # convert to numpy array
-    # convert to numpy array
-    token_distributions_array = np.array(token_distributions)
-    print(token_distributions_array.shape)  # 输出 (10, 50257)
+    return mean_perplexity
 
-    # Convert answer_tokens to CPU and NumPy array
-    answer_tokens = answer_tokens.cpu().numpy()  # 转为 NumPy 数组
-    print("answer_tokens: ", answer_tokens)  # 输出 answer_tokens:  [464]
-    print("len(answer_tokens): ", len(answer_tokens))  # 输出 len(answer_tokens):  1
 
-    # get the probability of the target token
-    selected_probs = token_distributions_array[:, answer_tokens]  # Shape: (max_tokens, len(answer_tokens))
-    print("Selected probabilities:\n", selected_probs)
-    print("Shape: ", selected_probs.shape)
-
-    return token_distributions
+# def get_QA_token_prob(model, tokenizer, max_tokens=10, device='cuda', qa_data=qa_data):
+#     model.to(device)
+#     model.eval()
+#
+#     # get a random question and answer pair
+#     random_qa = random.choice(qa_data)
+#     question = random_qa["question"]
+#     real_answer = random_qa["answer"]
+#     print("question is : ", question)
+#     print("real_answer is : ", real_answer)
+#
+#     answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(
+#         device)
+#     print("answer_tokens: ", answer_tokens[0])
+#     print("shape of answer_tokens: ", answer_tokens.shape)
+#
+#     # 假设 answer_tokens 是通过 tokenizer 得到的 input_ids
+#     answer_tokens_ids = answer_tokens[0].tolist()  # 转换为列表
+#     tokens = tokenizer.convert_ids_to_tokens(answer_tokens_ids)  # 转换为 token
+#     print("Tokens: ", tokens)
+#
+#     # Tokenize input sentence and move to device
+#     input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
+#     generated_sequence = input_sequence.clone()
+#
+#     token_distributions = []  # Store probability distributions for each generated token
+#
+#     with torch.no_grad():
+#         for _ in range(max_tokens):
+#             # Forward pass to get logits
+#             outputs = model(generated_sequence)
+#             logits = outputs[:, -1, :]  # Get the logits for the last token in the sequence
+#
+#             # Convert logits to probabilities
+#             probs = softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
+#
+#             # Store the probability distribution
+#             token_distributions.append(probs[0].cpu().numpy())
+#
+#             # Get the next token (argmax or sampling, here using argmax)
+#             next_token = torch.argmax(probs, dim=-1, keepdim=True)
+#
+#             # Append the predicted token to the sequence
+#             generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+#
+#     # convert to numpy array
+#     # convert to numpy array
+#     token_distributions_array = np.array(token_distributions)
+#     print(token_distributions_array.shape)  # 输出 (10, 50257)
+#
+#     # Convert answer_tokens to CPU and NumPy array
+#     answer_tokens = answer_tokens.cpu().numpy()  # 转为 NumPy 数组
+#     print("answer_tokens: ", answer_tokens)  # 输出 answer_tokens:  [464]
+#     print("len(answer_tokens): ", len(answer_tokens))  # 输出 len(answer_tokens):  1
+#
+#     # get the probability of the target token
+#     selected_probs = token_distributions_array[:, answer_tokens]  # Shape: (max_tokens, len(answer_tokens))
+#     print("Selected probabilities:\n", selected_probs)
+#     print("Shape: ", selected_probs.shape)
+#
+#     return token_distributions
 
 
 # model.to(device)
 # https://huggingface.co/thanhnew2001/everything
 
 # 3nd part of the evaluation
+
+
+# gpt 给的
+def get_QA_token_prob(model, tokenizer, qa_data, max_tokens=10, device='cuda'):
+    """
+    计算真实答案 `real_answer` 中 token 在模型生成 token 分布中的概率。
+
+    参数：
+    - model: 语言模型
+    - tokenizer: 与模型匹配的 tokenizer
+    - qa_data: 问答数据集 (包含 question 和 answer)
+    - max_tokens: 最大生成 token 数
+    - device: 运行设备 ('cuda' 或 'cpu')
+
+    返回：
+    - token_distributions: 存储每一步 token 概率分布的列表
+    """
+    model.to(device)
+    model.eval()
+
+    # 1️⃣  随机选择一个 Q&A
+    random_qa = random.choice(qa_data)
+    question = random_qa["question"]
+    real_answer = random_qa["answer"]
+
+    print(f"Question: {question}")
+    print(f"Real Answer: {real_answer}")
+
+    # 2️⃣  Tokenize real answer
+    answer_tokens = tokenizer(real_answer, truncation=True, max_length=200, return_tensors="pt")["input_ids"].to(device)
+    print(f"Answer Tokens: {answer_tokens[0].tolist()}")
+    print(f"Shape of Answer Tokens: {answer_tokens.shape}")
+
+    # 获取 answer tokens ID 和对应的 tokens
+    answer_token_ids = answer_tokens[0].tolist()
+    tokens = tokenizer.convert_ids_to_tokens(answer_token_ids)
+    print(f"Tokens: {tokens}")
+
+    # 3️⃣  Tokenize question
+    input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
+    generated_sequence = input_sequence.clone()
+
+    token_distributions = []  # 存储每个生成 token 的概率分布
+
+    with torch.no_grad():
+        for _ in range(max_tokens):
+            # 获取模型 logits
+            outputs, _ = model(generated_sequence)  # 确保 forward 输出符合你的 GPT2 结构
+            logits = outputs[:, -1, :]  # 取最后一个 token 的 logits
+
+            # 计算 softmax 概率
+            probs = F.softmax(logits, dim=-1)  # Shape: (batch_size, vocab_size)
+
+            # 存储概率分布
+            token_distributions.append(probs[0].cpu().numpy())
+
+            # 选择下一个 token（argmax 或随机采样）
+            next_token = torch.argmax(probs, dim=-1, keepdim=True)
+
+            # 将预测的 token 添加到序列
+            generated_sequence = torch.cat((generated_sequence, next_token), dim=1)
+
+    # 4️⃣  计算真实答案的 token 在生成概率中的位置
+    token_distributions_array = np.array(token_distributions)  # (max_tokens, vocab_size)
+
+    print(f"Token Distributions Shape: {token_distributions_array.shape}")  # (max_tokens, vocab_size)
+
+    # 5️⃣  获取真实答案 token 的概率
+    answer_tokens_cpu = answer_tokens.cpu().numpy().flatten()  # 转为 NumPy 数组 (1D)
+    print(f"Answer Tokens: {answer_tokens_cpu}")
+    print(f"Length of Answer Tokens: {len(answer_tokens_cpu)}")
+
+    # 这里的索引必须修正，避免 NumPy 多维索引错误
+    selected_probs = token_distributions_array[
+        np.arange(min(len(token_distributions), len(answer_tokens_cpu))), answer_tokens_cpu]
+
+    print(f"Selected Probabilities:\n {selected_probs}")
+    print(f"Shape of Selected Probabilities: {selected_probs.shape}")
+
+    return token_distributions
+
+
 def generate_write_n_sentences(model, tokenizer, device='cuda', num_sentence=10):
     model.to(device)
     model.eval()
@@ -217,42 +306,48 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load("GPT_512_50_2_percent.pth"))
     model.eval()  # ============================================
 
-    # valid_dataset = load_dataset("stas/openwebtext-10k", split="train", tokenizer=tokenizer, max_length=max_length)
-    # valid_dataset = valid_dataset.shuffle(seed=8)
-    # valid_dataset = valid_dataset.select(range(10))
-    #
-    # inputs = valid_dataset["input_ids"].to(device)
-    # labels = valid_dataset["labels"].to(device)
-    # loss = torch.nn.CrossEntropyLoss()
+    # 1->perplexity
+    # 2->QA token prob
+    # 3->generate and write n sentences
+    evaluate_mode = 1
 
-    # calcullate deals with one, so to process with 10 needed here or in the function itself
-    input_text = "The quick brown fox jumps over the lazy dog."
-    # tokenize and truncate to max_length tokens
-    encoded = tokenizer(input_text, truncation=True, max_length=200, return_tensors="pt")
-    # decode the tokenized input text
-    input_text = tokenizer.decode(encoded["input_ids"][0], skip_special_tokens=True)
-    print("input_text: ", input_text, '\n')
-    # string
-    print("Generated text: ")
+    # perplexity evaluation
+    if evaluate_mode == 1:
+        tokenizer.pad_token = tokenizer.eos_token  # 解决 padding 问题
+        # 2️⃣ 加载数据集
+        dataset = load_dataset("stas/openwebtext-10k", split="train")
 
-    # 1st calculate perplexity with cross entropy loss
-    mean_perplexity = calculate_perplexity(model, inputs=encoded["input_ids"].to(device), device=device)
-    print("Perplexity: ", mean_perplexity)
 
-    # get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
-    #
-    # # # 3rd generate and write n sentences
-    # generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
+        # 3️⃣ Tokenization 处理
+        def tokenize_function(examples):
+            return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
 
-    # while True:
-    #     # input text
-    #     input_text = input("Context: ")
-    #     if input_text == 'exit':
-    #         break
-    #
-    #     print("Generated text: ")
-    #
-    #     # inference
-    #     generated_sequence = predict(model, input_sequence=input_text, tokenizer=tokenizer, max_length=50,
-    #                                  eos_token_id=tokenizer.eos_token_id,
-    #                                  device=device)
+
+        tokenized_dataset = dataset.map(tokenize_function, batched=True)
+
+        # 4️⃣ 转换格式
+        tokenized_dataset.set_format(type="torch", columns=["input_ids"])
+
+        # 创建 DataLoader
+        dataloader = DataLoader(tokenized_dataset, batch_size=batch_size, shuffle=False)
+
+        # 计算数据集的平均 Perplexity
+        mean_ppl = calculate_perplexity(model, dataloader, device=device)
+        print(f"Dataset Perplexity: {mean_ppl}")
+
+    # QA token prob
+    elif evaluate_mode == 2:
+
+        # 读取 JSON 文件
+        with open("qa_dataset.json", "r", encoding="utf-8") as file:
+            qa_data = json.load(file)
+
+        # 打印数据集内容
+        print(json.dumps(qa_data, indent=4))
+
+        get_QA_token_prob(model, tokenizer, max_tokens=10, device=device)
+    # generate and write n sentences
+    elif evaluate_mode == 3:
+        generate_write_n_sentences(model, tokenizer, device, num_sentence=10)
+    else:
+        print("Invalid evaluation mode. Please choose 1, 2, or 3.")

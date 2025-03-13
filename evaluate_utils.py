@@ -1,6 +1,4 @@
 from model_refer import GPT2
-
-# 导入 PyTorch 相关库
 import torch
 import torch.nn.functional as F
 from transformers import GPT2Tokenizer
@@ -76,26 +74,23 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
         # tokenize the question
         input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
         # to store the probabilities of each token of the answer
-        selected_probs = []  # 存储当前 Q&A 的每个 token 概率
+        selected_probs = []  # store the probabilities of each token of the answer
 
-        # 3️⃣ 逐步计算每个 token 在 softmax 分布中的概率
+        # step by step, calculate the probability of each "right" token
         for i, token_id in enumerate(answer_token_ids):
             with torch.no_grad():
-                # 根据您的模型实现，forward返回(logits, loss)
                 logits, _ = model(input_sequence)
-
-                # 由于您的模型在预测模式下直接返回最后一个位置的logits
-                # 所以logits已经是[batch_size, vocab_size]的形状
-                probs = F.softmax(logits, dim=-1)  # 不需要索引[-1]
-                token_prob = probs[0, token_id].item()  # 获取当前 token 的概率
+                probs = F.softmax(logits, dim=-1)
+                # get the probabilities of the next "right" token
+                token_prob = probs[0, token_id].item()
                 selected_probs.append(token_prob)
 
             print(f"Step {i + 1}: P('{tokens[i]}') = {token_prob:.9f}")
 
-            # 将当前 token 追加到输入序列，以预测下一个 token
+            # add the token to the input sequence
             input_sequence = torch.cat((input_sequence, torch.tensor([[token_id]], device=device)), dim=1)
             print(f"Updated input sequence: {tokenizer.decode(input_sequence[0])}")
-        # 4️⃣ 计算当前 Q&A 的平均 token 概率
+        # to calculate the average probability of the answer
         qa_avg_prob = np.mean(selected_probs) if selected_probs else 0
         print(f"Average probability for this Q&A: {qa_avg_prob:.9f}")
 

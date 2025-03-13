@@ -1,16 +1,11 @@
-from Q_A import qa_data
 from model_refer import GPT2
-
-# 导入 Transformers 库的 GPT2 Tokenizer
-from transformers import GPT2Tokenizer
 
 # 导入 PyTorch 相关库
 import torch
 import torch.nn.functional as F
-from torch.nn.functional import softmax
+from transformers import GPT2Tokenizer
 from torch.utils.data import DataLoader
 from datasets import load_dataset
-import random
 from tqdm import tqdm
 import json
 import numpy as np
@@ -18,7 +13,7 @@ import numpy as np
 
 def calculate_perplexity(model, dataloader, device='cuda'):
     """
-    计算整个数据集的平均 perplexity (PPL) 并显示进度条
+    to calculate the mean perplexity of the dataset
     """
     model.to(device)
     model.eval()
@@ -29,23 +24,23 @@ def calculate_perplexity(model, dataloader, device='cuda'):
     with torch.no_grad():
         # tqdm
         for batch in tqdm(dataloader, desc="Processing Batches", unit="batch"):
-            input_ids = batch["input_ids"].to(device)  # (batch_size, seq_len)
+            input_ids = batch["input_ids"].to(device)
 
             # logits
-            logits, _ = model(input_ids, targets=input_ids)  # (batch_size, seq_len, vocab_size)
+            logits, _ = model(input_ids, targets=input_ids)
 
-            # 计算交叉熵损失
+            # cross entropy
             loss = F.cross_entropy(
-                logits.view(-1, logits.size(-1)),  # (batch_size * seq_len, vocab_size)
-                input_ids.view(-1),  # (batch_size * seq_len)
-                ignore_index=50256,  # 忽略 GPT-2 的 <|endoftext|>
-                reduction='sum'  # 计算总损失
+                logits.view(-1, logits.size(-1)),
+                input_ids.view(-1),
+                ignore_index=50256,  # ignore the padding token and eos token
+                reduction='sum'
             )
 
-            total_loss += loss.item()  # 累加损失
-            total_tokens += input_ids.numel()  # 计算总 token 数
+            total_loss += loss.item()  # total loss
+            total_tokens += input_ids.numel()  # number of tokens in the batch
 
-    # 计算平均 loss
+    # average loss
     avg_loss = total_loss / total_tokens
     mean_perplexity = torch.exp(torch.tensor(avg_loss)).item()
 
@@ -54,33 +49,33 @@ def calculate_perplexity(model, dataloader, device='cuda'):
 
 def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     """
-    计算整个问答数据集的平均概率
+    to calculate the average probability of all Q&As
     """
     model.to(device)
     model.eval()
 
-    qa_avg_probs = []  # 存储每个 Q&A 的平均概率
+    qa_avg_probs = []  # to store the average probabilities of each Q&A
 
     for idx, qa_pair in enumerate(qa_data):
-        # question = qa_pair["question"] + " "
-        question = qa_pair["question"].strip() + " "  # ✅ 确保只有一个空格
 
+        question = qa_pair["question"].strip() + " "  # get rid of extra spaces
         real_answer = qa_pair["answer"]
 
         print(f"\nProcessing Q&A {idx + 1}/{len(qa_data)}")
         print(f"Q: {question}")
         print(f"A: {real_answer}")
 
-        # 1️⃣ Tokenize 答案
+        # Tokenize the answer
         answer_tokens = tokenizer(real_answer, return_tensors="pt")["input_ids"].to(device)
         answer_token_ids = answer_tokens[0].tolist()
 
-        # 获取 token 名称
+        # Get tokens of the answer
         tokens = tokenizer.convert_ids_to_tokens(answer_token_ids)
         print(f"Tokens: {tokens}")
 
-        # 2️⃣ Tokenize 问题
+        # tokenize the question
         input_sequence = tokenizer(question, return_tensors="pt")["input_ids"].to(device)
+        # to store the probabilities of each token of the answer
         selected_probs = []  # 存储当前 Q&A 的每个 token 概率
 
         # 3️⃣ 逐步计算每个 token 在 softmax 分布中的概率
@@ -137,10 +132,10 @@ def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_ne
     generated_sentences.append(rating_prompt + "\n")  # 添加提示语
 
     for i in range(num_sentence):
-        # 确保使用适当的起始 token
+        # start with a start token
         start_token = torch.tensor([[tokenizer.bos_token_id]], dtype=torch.long).to(device)
 
-        # 生成文本
+        # to generate
         with torch.no_grad():
             generated_tokens = model.generate(
                 idx=start_token,
@@ -150,12 +145,12 @@ def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_ne
                 top_k=top_k
             )
 
-        # 解码文本
+        # decode
         generated_text = tokenizer.decode(generated_tokens[0], skip_special_tokens=True).strip()
 
-        # 确保句子不会有无意义的前缀
-        generated_text = generated_text.lstrip(",.:;!?")  # 删除前导符号
-        generated_sentences.append(f"\nThis is sentence {i + 1}:")  # 添加句子编号
+        # get rid of special tokens at the beginning
+        generated_text = generated_text.lstrip(",.:;!?")  # delete
+        generated_sentences.append(f"\nThis is sentence {i + 1}:")  # number the sentences
         generated_sentences.append(generated_text)
 
     # 写入文件

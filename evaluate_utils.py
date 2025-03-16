@@ -87,13 +87,14 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
                 selected_probs.append(token_prob)
 
             print(f"Step {i + 1}: P('{tokens[i]}') = {token_prob:.9f}")
+            print(f"Step {i + 1}: -log P('{tokens[i]}') = {-np.log(token_prob):.9f}")
 
             # add the token to the input sequence
             input_sequence = torch.cat((input_sequence, torch.tensor([[token_id]], device=device)), dim=1)
             print(f"Updated input sequence: {tokenizer.decode(input_sequence[0])}")
         # to calculate the average probability of the answer
         qa_avg_prob = np.mean(selected_probs) if selected_probs else 0
-        qa_negtive_log_prob = abs(np.prod(np.log(selected_probs)))
+        qa_negtive_log_prob = np.sum([-np.log(prob) for prob in selected_probs]) if selected_probs else float('inf')
 
         print(f"Average probability for this Q&A: {qa_avg_prob:.9f}")
         print(f"Negative log probability for this Q&A: {qa_negtive_log_prob:.9f}")
@@ -104,7 +105,7 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     dataset_avg_prob = np.mean(qa_avg_probs) if qa_avg_probs else 0
     dataset_negtive_log_prob = np.mean(qa_negtive_log_probs) if qa_negtive_log_probs else float('inf')
     print(f"\nFinal Dataset Average Probability: {dataset_avg_prob:.9f}")
-    print(f"Final Dataset Negative Log Probability: {dataset_negtive_log_prob:.9f}")
+    print(f"Final Averaged Negative Log Probability: {dataset_negtive_log_prob:.9f}")
 
     return dataset_avg_prob
 

@@ -53,7 +53,7 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
     model.eval()
 
     qa_avg_probs = []  # to store the average probabilities of each Q&A
-
+    qa_negtive_log_probs = []  # to store the negative log probabilities of each Q&A
     for idx, qa_pair in enumerate(qa_data):
 
         question = qa_pair["question"].strip() + " "  # get rid of extra spaces
@@ -83,6 +83,7 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
                 probs = F.softmax(logits, dim=-1)
                 # get the probabilities of the next "right" token
                 token_prob = probs[0, token_id].item()
+                # get the probability of the token
                 selected_probs.append(token_prob)
 
             print(f"Step {i + 1}: P('{tokens[i]}') = {token_prob:.9f}")
@@ -92,13 +93,18 @@ def get_QA_dataset_avg_prob(model, tokenizer, qa_data, device='cuda'):
             print(f"Updated input sequence: {tokenizer.decode(input_sequence[0])}")
         # to calculate the average probability of the answer
         qa_avg_prob = np.mean(selected_probs) if selected_probs else 0
+        qa_negtive_log_prob = abs(np.prod(np.log(selected_probs)))
+
         print(f"Average probability for this Q&A: {qa_avg_prob:.9f}")
+        print(f"Negative log probability for this Q&A: {qa_negtive_log_prob:.9f}")
 
         qa_avg_probs.append(qa_avg_prob)
-
+        qa_negtive_log_probs.append(qa_negtive_log_prob)
     # avearge probability of the dataset
     dataset_avg_prob = np.mean(qa_avg_probs) if qa_avg_probs else 0
+    dataset_negtive_log_prob = np.mean(qa_negtive_log_probs) if qa_negtive_log_probs else float('inf')
     print(f"\nFinal Dataset Average Probability: {dataset_avg_prob:.9f}")
+    print(f"Final Dataset Negative Log Probability: {dataset_negtive_log_prob:.9f}")
 
     return dataset_avg_prob
 

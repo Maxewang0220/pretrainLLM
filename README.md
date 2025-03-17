@@ -36,6 +36,17 @@
 6. **GPT2_Post**  
    [View Model](https://drive.google.com/file/d/15wKgtZndKI_9iMBf47AZuyKbPHlg9ojM/view?usp=drive_link)
 
+# Datasets
+
+1. **bookcorpus/bookcorpus**
+   https://huggingface.co/datasets/bookcorpus/bookcorpus   
+
+2. **stas/openwebtext-10k**
+   https://huggingface.co/datasets/stas/openwebtext-10k
+   
+3. **FreedomIntelligence/medical-o1-reasoning-SFT**
+   https://huggingface.co/datasets/FreedomIntelligence/medical-o1-reasoning-SFT
+
 # Run the Code
 
 To check the model, you can change the model path in `predict.py` and run the code.

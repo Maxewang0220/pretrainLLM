@@ -1,6 +1,5 @@
 import datasets
 from datasets import Dataset
-from transformers import GPT2Tokenizer
 
 
 # Load the pretraining dataset
@@ -72,66 +71,12 @@ def load_dataset_bookcorpus(dataset_name, split, tokenizer, max_length=512, conc
     return new_dataset
 
 
-# Load the Alpaca dataset
-def load_dataset_Alpaca(dataset_name, split, tokenizer, max_length=512):
-    # Step 1: Load dataset
-    dataset = datasets.load_dataset(
-        dataset_name,
-        split=split,
-        trust_remote_code=True
-    )
-
-    # Step 2: Concatenate text
-    def concatenate_text(examples):
-        texts = []
-        for instr, inp, out in zip(examples["instruction"], examples["input"], examples["output"]):
-            # 如果 input 为空，则只拼接 instruction 和 output
-            if inp and inp.strip():
-                full_text = f"{instr}\n{inp}\n{out}"
-            else:
-                full_text = f"{instr}\n{out}"
-            texts.append(full_text)
-        return {"text": texts}
-
-    concatenated_dataset = dataset.map(
-        concatenate_text,
-        batched=True,
-        batch_size=1000,  # Adjust depending on memory
-        num_proc=1,  # Number of parallel processes
-    )
-
-    # Step 3: Chunk tokenized text
-    def tokenize_and_pad(examples):
-        text = examples["text"]
-        tokens = tokenizer(text, truncation=False, padding=False)["input_ids"]
-
-        # 如果超过最大长度，则截断；不足则用 eos_token_id 填充
-        if len(tokens) >= max_length:
-            tokens = tokens[:max_length]
-        else:
-            tokens = tokens + [tokenizer.eos_token_id] * (max_length - len(tokens))
-        return {"input_ids": tokens}
-
-    tokenized_dataset = concatenated_dataset.map(
-        tokenize_and_pad,
-        batched=False
-    )
-
-    # Step 4: 设置为 PyTorch 格式，并保存预处理后的数据
-    tokenized_dataset.set_format(type="torch", columns=["input_ids"])
-    tokenized_dataset.save_to_disk("./alpaca_512")
-
-    return tokenized_dataset
-
-
 if __name__ == "__main__":
-    # pretraining_dataset = load_dataset(
-    #     "upstage/Pretraining_Dataset",
-    #     split="train"
-    # )
-    #
-    # print(pretraining_dataset)
-    # for example in pretraining_dataset["text"][:5]:
-    #     print(example)
+    pretraining_dataset = load_dataset_bookcorpus(
+        "upstage/Pretraining_Dataset",
+        split="train"
+    )
 
-    load_dataset_Alpaca("tatsu-lab/alpaca", split="train", tokenizer=GPT2Tokenizer.from_pretrained("gpt2"))
+    print(pretraining_dataset)
+    for example in pretraining_dataset["text"][:5]:
+        print(example)

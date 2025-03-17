@@ -1,6 +1,6 @@
 import json
 
-# 数据集 大概220题
+# qa dataset
 qa_data = [
     {"question": "What is the largest planet?", "answer": "Jupiter"},
     {"question": "What is the currency of Japan?", "answer": "Yen"},
@@ -499,7 +499,7 @@ qa_data = [
 
 ]
 
-# 保存为 JSON 文件
+# save to Json file
 with open("qa_dataset.json", "w", encoding="utf-8") as f:
     json.dump(qa_data, f, indent=4)
 

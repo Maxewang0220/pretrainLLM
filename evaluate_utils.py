@@ -1,4 +1,4 @@
-from model_refer import GPT2
+from model import GPT2
 import torch
 import torch.nn.functional as F
 from transformers import GPT2Tokenizer
@@ -131,7 +131,7 @@ def generate_write_n_sentences(model, tokenizer, device, num_sentence=10, max_ne
     Creativity and Style: X/10 """
 
     generated_sentences = []
-    generated_sentences.append(rating_prompt + "\n")  # 添加提示语
+    generated_sentences.append(rating_prompt + "\n")  # add prompt
 
     for i in range(num_sentence):
         # start with a start token

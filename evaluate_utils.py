@@ -18,6 +18,7 @@ def calculate_perplexity(model, dataloader, device='cuda'):
 
     total_loss = 0.0
     total_tokens = 0
+    pad_token_id = 50256  # padding token
 
     with torch.no_grad():
         # tqdm
@@ -36,7 +37,7 @@ def calculate_perplexity(model, dataloader, device='cuda'):
             )
 
             total_loss += loss.item()  # total loss
-            total_tokens += input_ids.numel()  # number of tokens in the batch
+            total_tokens += (input_ids != pad_token_id).sum().item()  # number of valid tokens in the batch
 
     # average loss
     avg_loss = total_loss / total_tokens
